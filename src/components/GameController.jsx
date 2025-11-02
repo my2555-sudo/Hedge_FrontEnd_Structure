@@ -1,17 +1,28 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { applyRound, getGameState, resetGame, ROUND_DURATION } from "../gameLogic";
 import { nextEvent } from "../data/mockEvents";
 import LeaderboardTrigger from "./LeaderboardTrigger";
+import { useEventBus } from "./EventContext.jsx";
+import { useBlackSwan } from "./useBlackSwan";
+import BlackSwanModal from "./BlackSwanModal.jsx";
+
+// ---- News cadence knobs ----
+const NEWS_TARGET_PER_ROUND = 3;        // ↑ increase = more headlines per 30s round
+const ROUND_SECONDS = ROUND_DURATION;   // 30
+const NEWS_MEAN_SEC = ROUND_SECONDS / Math.max(1, NEWS_TARGET_PER_ROUND);
+const NEWS_MIN_MS = Math.max(1500, NEWS_MEAN_SEC * 0.6 * 1000);
+const NEWS_MAX_MS = NEWS_MEAN_SEC * 1.4 * 1000;
+const NEWS_FIRE_PROB = 0.9;             // keep high; delay drives cadence
 
 const INITIAL_PORTFOLIO = 20000;
 
 const TITLES = [
-  { minGain: 0, title: "Novice Trader" },
+  { minGain: 0,    title: "Novice Trader" },
   { minGain: 0.05, title: "Market Strategist" },
   { minGain: 0.15, title: "Senior Trader" },
   { minGain: 0.25, title: "Portfolio Manager" },
-  { minGain: 0.4, title: "Market Veteran" },
-  { minGain: 0.6, title: "Trading Legend" },
+  { minGain: 0.4,  title: "Market Veteran" },
+  { minGain: 0.6,  title: "Trading Legend" },
 ];
 
 function calculateTitle(portfolioValue) {
@@ -22,15 +33,24 @@ function calculateTitle(portfolioValue) {
   return TITLES[0].title;
 }
 
-export default function GameController({ gameDuration = 300, playerName = "Player1" }) {
+export default function GameController({
+  gameDuration = 300,
+  playerName = "Player1",
+  emitEvents = true,
+  controlledActive,           // NEW: allow parent to control active state
+}) {
   const totalRounds = Math.floor(gameDuration / ROUND_DURATION);
+  const { addEvent } = useEventBus();
 
-  const [gameState, setGameState] = useState(() => getGameState() || {
-    portfolioValue: INITIAL_PORTFOLIO,
-    roundsCompleted: 0,
-    title: "Novice Trader",
-    playerName,
-  });
+  const [gameState, setGameState] = useState(
+    () =>
+      getGameState() || {
+        portfolioValue: INITIAL_PORTFOLIO,
+        roundsCompleted: 0,
+        title: "Novice Trader",
+        playerName,
+      }
+  );
 
   const [seconds, setSeconds] = useState(ROUND_DURATION);
   const [gameSeconds, setGameSeconds] = useState(gameDuration);
@@ -41,77 +61,130 @@ export default function GameController({ gameDuration = 300, playerName = "Playe
   const [eventMessage, setEventMessage] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);
 
-  // --- Countdown timers ---
+  // Black Swan UI/state
+  const [blackSwan, setBlackSwan] = useState(null);
+  const [bsOccurredThisRound, setBsOccurredThisRound] = useState(false);
+
+  // parent-controlled active flag (if provided)
+  const isActive = controlledActive ?? active;
+
+  // StrictMode-safe emitter guard
+  const loopRef = useRef({ running: false, timeoutId: null });
+
+  // --- Countdown timers (internal to GameController card) ---
   useEffect(() => {
-    if (!active || paused) return;
+    if (!isActive || paused) return;
 
     if (seconds <= 0) {
       endRound();
       return;
     }
-
     if (gameSeconds <= 0) {
       stopGame();
       return;
     }
 
     const timer = setInterval(() => {
-      setSeconds(prev => prev - 1);
-      setGameSeconds(prev => prev - 1);
+      setSeconds((prev) => prev - 1);
+      setGameSeconds((prev) => prev - 1);
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [active, paused, seconds, gameSeconds]);
+  }, [isActive, paused, seconds, gameSeconds]);
 
-  // --- Random event generation ---
+  // --- Normal (MACRO/MICRO) random event generation ---
   useEffect(() => {
-    if (!active) return;
+    if (!isActive || !emitEvents) return;
+    if (loopRef.current.running) return; // prevent double-loop in StrictMode
+    loopRef.current.running = true;
 
-    let isCancelled = false;
+    let cancelled = false;
 
     const scheduleEvent = () => {
-      if (isCancelled) return;
+      if (cancelled) return;
 
-      if (!paused && !roundOver && Math.random() < 0.4) {
-        const event = nextEvent();
-        handleEvent(event);
+      if (!paused && !roundOver && Math.random() < NEWS_FIRE_PROB) {
+        handleEvent(nextEvent());
       }
-
-      const nextTimeout = 15000 + Math.random() * 20000;
-      setTimeout(scheduleEvent, nextTimeout);
+      const nextTimeout = NEWS_MIN_MS + Math.random() * (NEWS_MAX_MS - NEWS_MIN_MS); 
+      loopRef.current.timeoutId = setTimeout(scheduleEvent, nextTimeout);
     };
 
     scheduleEvent();
-    return () => { isCancelled = true; };
-  }, [active, paused, roundOver]);
 
-  // --- Handle event impact ---
-  function handleEvent(event) {
-    setGameState(prevState => {
-      if (!prevState) return prevState;
-      const impact = Math.round(prevState.portfolioValue * (event.impactPct || 0));
-      const newPortfolio = Math.max(0, prevState.portfolioValue + impact);
+    return () => {
+      cancelled = true;
+      if (loopRef.current.timeoutId) clearTimeout(loopRef.current.timeoutId);
+      loopRef.current.running = false;
+      loopRef.current.timeoutId = null;
+    };
+  }, [isActive, paused, roundOver, emitEvents]);
 
-      const updatedState = {
-        ...prevState,
+  // --- Black Swan emitter (rare, Poisson-timed) ---
+  useBlackSwan({
+    active: isActive && emitEvents,
+    meanIntervalSec: 120, // avg every ~2 minutes (bounded in hook)
+    onEvent: (ev) => {
+      setBsOccurredThisRound(true);
+      setBlackSwan(ev);       // open modal
+      handleEvent(ev, { isBlackSwan: true });
+    },
+  });
+
+  // --- Handle event impact & publish to feed ---
+  function handleEvent(event, opts = {}) {
+    setGameState((prev) => {
+      if (!prev) return prev;
+
+      const rawImpact = event.impactPct || 0;
+      const impactAbs = Math.round(prev.portfolioValue * rawImpact);
+      const newPortfolio = Math.max(0, prev.portfolioValue + impactAbs);
+
+      const updated = {
+        ...prev,
         portfolioValue: newPortfolio,
         title: calculateTitle(newPortfolio),
       };
 
+      // publish to global feed (center panel)
+      addEvent({ ...event, ts: Date.now() });
+
+      // toast
       setEventMessage({
-        text: `${event.title} (${impact >= 0 ? "+" : ""}${impact})`,
+        text: `${event.title} (${impactAbs >= 0 ? "+" : ""}${impactAbs})`,
         type: event.type,
       });
       setTimeout(() => setEventMessage(null), 3000);
 
-      return updatedState;
+      return updated;
     });
   }
 
-  // --- Game control functions ---
+  // --- Player choice to resolve Black Swan (follow-up impact) ---
+  function resolveBlackSwan(choice) {
+    if (!blackSwan) return;
+    const base = blackSwan.impactPct || 0;
+
+    let followUp = 0;
+    if (choice === "HEDGE")  followUp = base * 0.3; // soften
+    if (choice === "HOLD")   followUp = base * 0.6; // neutral
+    if (choice === "DOUBLE") followUp = base * 1.2; // amplify
+
+    if (followUp) {
+      handleEvent({
+        ...blackSwan,
+        impactPct: followUp,
+        title: `${blackSwan.title} (Aftershock)`,
+      });
+    }
+    setBlackSwan(null);
+  }
+
+  // --- Game controls ---
   const startGame = () => {
     const newState = resetGame(playerName);
     if (!newState) return console.error("resetGame() returned undefined!");
+
     setGameState(newState);
     setSeconds(ROUND_DURATION);
     setGameSeconds(gameDuration);
@@ -121,6 +194,11 @@ export default function GameController({ gameDuration = 300, playerName = "Playe
     setRoundOver(false);
     setEventMessage(null);
     setLeaderboard([]);
+    setBsOccurredThisRound(false);
+    setBlackSwan(null);
+
+    // kick off with one immediate event so feed isn't empty
+    try { handleEvent(nextEvent()); } catch (e) { console.error(e); }
   };
 
   const stopGame = () => {
@@ -130,8 +208,7 @@ export default function GameController({ gameDuration = 300, playerName = "Playe
   };
 
   const togglePause = () => {
-    if (!active) return;
-
+    if (!isActive) return;
     if (!paused) {
       setPaused(true);
     } else {
@@ -139,7 +216,8 @@ export default function GameController({ gameDuration = 300, playerName = "Playe
       if (roundOver) {
         setRoundOver(false);
         setSeconds(ROUND_DURATION);
-        setRoundNumber(prev => prev + 1);
+        setRoundNumber((prev) => prev + 1);
+        setBsOccurredThisRound(false); // new round
       }
     }
   };
@@ -147,13 +225,19 @@ export default function GameController({ gameDuration = 300, playerName = "Playe
   const endRound = () => {
     if (!gameState) return;
 
-    setGameState(prev => ({
-      ...applyRound({ portfolioValue: prev.portfolioValue, blackSwanOccurred: false }) || prev,
+    setGameState((prev) => ({
+      ...(
+        applyRound({
+          portfolioValue: prev.portfolioValue,
+          blackSwanOccurred: bsOccurredThisRound,
+          blackSwanType: bsOccurredThisRound ? (blackSwan?.id || "occurred") : null,
+        }) || prev
+      ),
       title: calculateTitle(prev.portfolioValue),
       roundsCompleted: roundNumber,
     }));
 
-    // --- Leaderboard update ---
+    // leaderboard snapshot
     const entry = {
       playerName,
       portfolioValue: gameState.portfolioValue,
@@ -161,8 +245,8 @@ export default function GameController({ gameDuration = 300, playerName = "Playe
       roundsCompleted: roundNumber,
       timestamp: Date.now(),
     };
-    setLeaderboard(prev => {
-      const updated = [...prev.filter(e => e.playerName !== playerName), entry];
+    setLeaderboard((prev) => {
+      const updated = [...prev.filter((e) => e.playerName !== playerName), entry];
       updated.sort((a, b) => b.portfolioValue - a.portfolioValue);
       return updated;
     });
@@ -175,36 +259,23 @@ export default function GameController({ gameDuration = 300, playerName = "Playe
     }
   };
 
-  // --- UI Styling ---
+  // --- UI styles ---
   const containerStyle = {
     padding: "16px",
     fontFamily: "Arial, sans-serif",
     color: "white",
     textAlign: "center",
   };
-
-  const timerStyle = {
-    fontSize: "32px",
-    fontWeight: "bold",
-    marginBottom: "12px",
-  };
-
+  const timerStyle = { fontSize: "32px", fontWeight: "bold", marginBottom: "12px" };
   const statusBadgeStyle = {
     fontSize: "14px",
     padding: "2px 6px",
     borderRadius: "4px",
-    backgroundColor: active && !paused ? "#28a745" : "#ffc107",
+    backgroundColor: isActive && !paused ? "#28a745" : "#ffc107",
     fontWeight: "bold",
     marginLeft: "8px",
   };
-
-  const buttonsStyle = {
-    display: "flex",
-    justifyContent: "center",
-    gap: "8px",
-    marginTop: "12px",
-  };
-
+  const buttonsStyle = { display: "flex", justifyContent: "center", gap: "8px", marginTop: "12px" };
   const btnBaseStyle = {
     padding: "8px 16px",
     border: "none",
@@ -213,21 +284,16 @@ export default function GameController({ gameDuration = 300, playerName = "Playe
     cursor: "pointer",
     color: "white",
   };
-
   const startStopStyle = { ...btnBaseStyle, backgroundColor: "#28a745" };
   const pauseResumeStyle = { ...btnBaseStyle, backgroundColor: "#ffc107" };
-
   const formatTime = (s) =>
-    `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60)
-      .toString()
-      .padStart(2, "0")}`;
-
+    `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
   const getEventStyle = (type) => ({
     position: "fixed",
     bottom: "20px",
     left: "50%",
     transform: "translateX(-50%)",
-    backgroundColor: type === "MACRO" ? "#ff4d4f" : "#1890ff",
+    backgroundColor: type === "MACRO" ? "#ff4d4f" : type === "BLACKSWAN" ? "#d81b60" : "#1890ff",
     padding: "8px 16px",
     borderRadius: "6px",
     fontSize: "16px",
@@ -238,16 +304,18 @@ export default function GameController({ gameDuration = 300, playerName = "Playe
     zIndex: 1200,
   });
 
-  // --- Render ---
   return (
     <div style={containerStyle}>
+      {/* Black Swan decision modal */}
+      <BlackSwanModal event={blackSwan} open={!!blackSwan} onChoose={resolveBlackSwan} />
+
       <div style={{ marginBottom: "16px" }}>
         <strong>Game Time:</strong> {formatTime(gameSeconds)}
       </div>
 
       <div style={timerStyle}>
         {String(seconds).padStart(2, "0")}s
-        <span style={statusBadgeStyle}>{active && !paused ? "LIVE" : "PAUSED"}</span>
+        <span style={statusBadgeStyle}>{isActive && !paused ? "LIVE" : "PAUSED"}</span>
       </div>
 
       <div>
@@ -256,14 +324,22 @@ export default function GameController({ gameDuration = 300, playerName = "Playe
         <div><strong>Title:</strong> {gameState.title}</div>
       </div>
 
+      {/* If parent is controlling active state, gray out the internal Start/Stop */}
       <div style={buttonsStyle}>
-        <button style={startStopStyle} onClick={active ? stopGame : startGame}>
-          {active ? "Stop" : "Start"}
+        <button
+          style={{
+            ...startStopStyle,
+            opacity: controlledActive !== undefined ? 0.5 : 1,
+            pointerEvents: controlledActive !== undefined ? "none" : "auto",
+          }}
+          onClick={active ? stopGame : startGame}
+        >
+          {isActive ? "Stop" : "Start"}
         </button>
         <button
-          style={!active ? { ...pauseResumeStyle, backgroundColor: "#ccc", cursor: "not-allowed" } : pauseResumeStyle}
+          style={!isActive ? { ...pauseResumeStyle, backgroundColor: "#ccc", cursor: "not-allowed" } : pauseResumeStyle}
           onClick={togglePause}
-          disabled={!active}
+          disabled={!isActive}
         >
           {paused && !roundOver ? "Resume" : "Pause"}
         </button>

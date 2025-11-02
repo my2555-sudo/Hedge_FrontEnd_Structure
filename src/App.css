@@ -137,3 +137,35 @@ body{
 .LeftRail, .CenterFeed, .RightPortfolio {
   min-height: calc(100vh - 36px); /* 36 = 2*padding */
 }
+
+/* --- NewsFeed --- */
+.newsfeed {
+  border: 1px solid rgba(255,255,255,0.12);
+  background: #0c0f14;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.newsfeed__bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; background: #121722;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.newsfeed__count { opacity: 0.7; font-size: 12px; }
+.newsfeed__ticker { max-height: 260px; overflow-y: auto; }
+.newsfeed__item { padding: 6px 10px; border-bottom: 1px dashed rgba(255,255,255,0.06); }
+.newsfeed__empty { padding: 12px; opacity: 0.7; text-align: center; }
+
+.nf-card {
+  width: 100%;
+  display: grid; grid-template-columns: 24px 1fr auto; gap: 8px;
+  align-items: center; padding: 8px 6px; text-align: left;
+  background: transparent; color: inherit; border: none; cursor: pointer;
+}
+.nf-card:hover { background: rgba(255,255,255,0.05); }
+.nf-card.macro .nf-headline { color: #ffd166; }  /* Macro = amber */
+.nf-card.micro .nf-headline { color: #80c7ff; }  /* Micro = blue */
+
+.nf-icon { font-size: 16px; line-height: 1; }
+.nf-headline { font-weight: 600; }
+.nf-time { font-size: 12px; opacity: 0.7; }
+

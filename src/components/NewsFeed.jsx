@@ -1,18 +1,24 @@
-export default function NewsFeed({ items }) {
+import React from "react";
+import HeadlineCard from "./HeadlineCard.jsx";
+
+export default function NewsFeed({ events = [], onSelect }) {
   return (
-    <div className="NewsList">
-      {items.length === 0 && (
-        <div className="Headline">
-          <div className="meta">No news yet</div>
-          Waiting for market events...
-        </div>
-      )}
-      {items.map(item => (
-        <div key={item.id} className="Headline" title={item.detail}>
-          <div className="meta">{item.type} • impact {(item.impactPct*100).toFixed(1)}%</div>
-          {item.title}
-        </div>
-      ))}
-    </div>
+    <section className="newsfeed">
+      <header className="newsfeed__bar">
+        <strong>News</strong>
+        <span className="newsfeed__count">{events.length}</span>
+      </header>
+
+      <div className="newsfeed__ticker" role="list">
+        {events.map((e) => (
+          <div role="listitem" key={e.runtimeId} className="newsfeed__item">
+            <HeadlineCard event={e} onClick={onSelect} />
+          </div>
+        ))}
+        {events.length === 0 && (
+          <div className="newsfeed__empty">No headlines yet—start the game!</div>
+        )}
+      </div>
+    </section>
   );
 }
