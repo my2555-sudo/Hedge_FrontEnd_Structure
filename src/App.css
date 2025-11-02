@@ -20,12 +20,17 @@ body{
 }
 
 .AppRoot{
-  display:grid;
-  grid-template-columns: 260px 1fr 420px;
-  gap:18px;
-  padding:18px;
-  min-height:100vh;
+  width: 100%;
+  min-height: 100vh;
+  display: grid;
+  /* 左列-中列-右列：在不同屏宽下自适应 */
+  grid-template-columns: clamp(230px, 18vw, 320px)
+                         1fr
+                         clamp(380px, 30vw, 540px);
+  gap: 18px;
+  padding: 18px;
 }
+
 
 .glass{
   background: var(--panel);
@@ -128,3 +133,7 @@ body{
 .Timer .sub{ font-size:12px; opacity:.7; margin-left:8px; }
 
 .Controller{ display:flex; gap:10px; }
+
+.LeftRail, .CenterFeed, .RightPortfolio {
+  min-height: calc(100vh - 36px); /* 36 = 2*padding */
+}
