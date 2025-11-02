@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { applyRound, getGameState, resetGame, ROUND_DURATION } from "../gameLogic";
-import { nextEvent } from "../data/mockEvents"; // updated path
+import { nextEvent } from "../data/mockEvents";
+import LeaderboardTrigger from "./LeaderboardTrigger";
 
 const INITIAL_PORTFOLIO = 20000;
 
@@ -21,16 +22,13 @@ function calculateTitle(portfolioValue) {
   return TITLES[0].title;
 }
 
-export default function GameController({ gameDuration = 300, onGameEnd, playerName = "Player1" }) {
+export default function GameController({ gameDuration = 300, playerName = "Player1" }) {
   const totalRounds = Math.floor(gameDuration / ROUND_DURATION);
 
   const [gameState, setGameState] = useState(() => getGameState() || {
     portfolioValue: INITIAL_PORTFOLIO,
-    streak: 0,
     roundsCompleted: 0,
     title: "Novice Trader",
-    blackSwanOccurred: false,
-    blackSwanType: null,
     playerName,
   });
 
@@ -41,8 +39,9 @@ export default function GameController({ gameDuration = 300, onGameEnd, playerNa
   const [roundNumber, setRoundNumber] = useState(1);
   const [roundOver, setRoundOver] = useState(false);
   const [eventMessage, setEventMessage] = useState(null);
+  const [leaderboard, setLeaderboard] = useState([]);
 
-  // Round and game countdown
+  // --- Countdown timers ---
   useEffect(() => {
     if (!active || paused) return;
 
@@ -64,7 +63,7 @@ export default function GameController({ gameDuration = 300, onGameEnd, playerNa
     return () => clearInterval(timer);
   }, [active, paused, seconds, gameSeconds]);
 
-  // Event generator (~1 per round)
+  // --- Random event generation ---
   useEffect(() => {
     if (!active) return;
 
@@ -73,48 +72,43 @@ export default function GameController({ gameDuration = 300, onGameEnd, playerNa
     const scheduleEvent = () => {
       if (isCancelled) return;
 
-      if (!paused && !roundOver) {
+      if (!paused && !roundOver && Math.random() < 0.4) {
         const event = nextEvent();
         handleEvent(event);
       }
 
-      const nextTimeout = 15000 + Math.random() * 30000;
+      const nextTimeout = 15000 + Math.random() * 20000;
       setTimeout(scheduleEvent, nextTimeout);
     };
 
     scheduleEvent();
-
     return () => { isCancelled = true; };
   }, [active, paused, roundOver]);
 
+  // --- Handle event impact ---
   function handleEvent(event) {
     setGameState(prevState => {
       if (!prevState) return prevState;
+      const impact = Math.round(prevState.portfolioValue * (event.impactPct || 0));
+      const newPortfolio = Math.max(0, prevState.portfolioValue + impact);
 
-      try {
-        const impact = Math.round(prevState.portfolioValue * (event.impactPct || 0));
-        const newPortfolio = Math.max(0, prevState.portfolioValue + impact);
+      const updatedState = {
+        ...prevState,
+        portfolioValue: newPortfolio,
+        title: calculateTitle(newPortfolio),
+      };
 
-        const updatedState = {
-          ...applyRound({
-            portfolioValue: newPortfolio,
-            blackSwanOccurred: event.type === "MACRO" && event.impactPct < 0,
-            blackSwanType: event.type
-          }) || prevState,
-          title: calculateTitle(newPortfolio),
-        };
+      setEventMessage({
+        text: `${event.title} (${impact >= 0 ? "+" : ""}${impact})`,
+        type: event.type,
+      });
+      setTimeout(() => setEventMessage(null), 3000);
 
-        setEventMessage({ text: `${event.title} (${impact >= 0 ? "+" : ""}${impact})`, type: event.type });
-        setTimeout(() => setEventMessage(null), 3000);
-
-        return updatedState;
-      } catch (err) {
-        console.error("Error in handleEvent:", err);
-        return prevState;
-      }
+      return updatedState;
     });
   }
 
+  // --- Game control functions ---
   const startGame = () => {
     const newState = resetGame(playerName);
     if (!newState) return console.error("resetGame() returned undefined!");
@@ -126,14 +120,13 @@ export default function GameController({ gameDuration = 300, onGameEnd, playerNa
     setRoundNumber(1);
     setRoundOver(false);
     setEventMessage(null);
+    setLeaderboard([]);
   };
 
   const stopGame = () => {
     setActive(false);
     setPaused(false);
     setRoundOver(false);
-    setEventMessage(null);
-    onGameEnd?.(gameState);
   };
 
   const togglePause = () => {
@@ -157,7 +150,22 @@ export default function GameController({ gameDuration = 300, onGameEnd, playerNa
     setGameState(prev => ({
       ...applyRound({ portfolioValue: prev.portfolioValue, blackSwanOccurred: false }) || prev,
       title: calculateTitle(prev.portfolioValue),
+      roundsCompleted: roundNumber,
     }));
+
+    // --- Leaderboard update ---
+    const entry = {
+      playerName,
+      portfolioValue: gameState.portfolioValue,
+      title: calculateTitle(gameState.portfolioValue),
+      roundsCompleted: roundNumber,
+      timestamp: Date.now(),
+    };
+    setLeaderboard(prev => {
+      const updated = [...prev.filter(e => e.playerName !== playerName), entry];
+      updated.sort((a, b) => b.portfolioValue - a.portfolioValue);
+      return updated;
+    });
 
     if (roundNumber >= totalRounds) {
       stopGame();
@@ -167,23 +175,52 @@ export default function GameController({ gameDuration = 300, onGameEnd, playerNa
     }
   };
 
-  // Styles
-  const containerStyle = { padding: "16px", fontFamily: "Arial, sans-serif", color: "white", textAlign: "center" };
-  const timerStyle = { fontSize: "32px", fontWeight: "bold", marginBottom: "12px" };
-  const statusBadgeStyle = { fontSize: "14px", padding: "2px 6px", borderRadius: "4px", backgroundColor: active && !paused ? "#28a745" : "#ffc107", fontWeight: "bold", marginLeft: "8px" };
-  const statusStyle = { marginBottom: "12px", fontSize: "16px" };
-  const buttonsStyle = { display: "flex", justifyContent: "center", gap: "8px" };
-  const btnBaseStyle = { padding: "8px 16px", border: "none", borderRadius: "6px", fontSize: "14px", cursor: "pointer", color: "white" };
+  // --- UI Styling ---
+  const containerStyle = {
+    padding: "16px",
+    fontFamily: "Arial, sans-serif",
+    color: "white",
+    textAlign: "center",
+  };
+
+  const timerStyle = {
+    fontSize: "32px",
+    fontWeight: "bold",
+    marginBottom: "12px",
+  };
+
+  const statusBadgeStyle = {
+    fontSize: "14px",
+    padding: "2px 6px",
+    borderRadius: "4px",
+    backgroundColor: active && !paused ? "#28a745" : "#ffc107",
+    fontWeight: "bold",
+    marginLeft: "8px",
+  };
+
+  const buttonsStyle = {
+    display: "flex",
+    justifyContent: "center",
+    gap: "8px",
+    marginTop: "12px",
+  };
+
+  const btnBaseStyle = {
+    padding: "8px 16px",
+    border: "none",
+    borderRadius: "6px",
+    fontSize: "14px",
+    cursor: "pointer",
+    color: "white",
+  };
+
   const startStopStyle = { ...btnBaseStyle, backgroundColor: "#28a745" };
   const pauseResumeStyle = { ...btnBaseStyle, backgroundColor: "#ffc107" };
-  const roundOverStyle = {
-    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.85)", color: "white",
-    display: roundOver ? "flex" : "none", flexDirection: "column",
-    justifyContent: "center", alignItems: "center",
-    fontSize: "28px", fontWeight: "bold", zIndex: 1000
-  };
-  const overlayButtonStyle = { ...btnBaseStyle, backgroundColor: "#28a745", marginTop: "16px" };
+
+  const formatTime = (s) =>
+    `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60)
+      .toString()
+      .padStart(2, "0")}`;
 
   const getEventStyle = (type) => ({
     position: "fixed",
@@ -198,11 +235,10 @@ export default function GameController({ gameDuration = 300, onGameEnd, playerNa
     textAlign: "center",
     minWidth: "250px",
     color: "white",
-    zIndex: 2000,
+    zIndex: 1200,
   });
 
-  const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2,"0")}:${(s % 60).toString().padStart(2,"0")}`;
-
+  // --- Render ---
   return (
     <div style={containerStyle}>
       <div style={{ marginBottom: "16px" }}>
@@ -214,15 +250,16 @@ export default function GameController({ gameDuration = 300, onGameEnd, playerNa
         <span style={statusBadgeStyle}>{active && !paused ? "LIVE" : "PAUSED"}</span>
       </div>
 
-      {/* Status on separate lines */}
-      <div style={statusStyle}>
+      <div>
         <div><strong>Round:</strong> {roundNumber} / {totalRounds}</div>
         <div><strong>Portfolio:</strong> ${gameState.portfolioValue.toLocaleString()}</div>
         <div><strong>Title:</strong> {gameState.title}</div>
       </div>
 
       <div style={buttonsStyle}>
-        <button style={startStopStyle} onClick={active ? stopGame : startGame}>{active ? "Stop" : "Start"}</button>
+        <button style={startStopStyle} onClick={active ? stopGame : startGame}>
+          {active ? "Stop" : "Start"}
+        </button>
         <button
           style={!active ? { ...pauseResumeStyle, backgroundColor: "#ccc", cursor: "not-allowed" } : pauseResumeStyle}
           onClick={togglePause}
@@ -232,15 +269,16 @@ export default function GameController({ gameDuration = 300, onGameEnd, playerNa
         </button>
       </div>
 
-      {/* Round-over overlay */}
-      <div style={roundOverStyle}>
-        ROUND OVER
-        <div style={{ fontSize: "18px", marginTop: "12px" }}>Click Resume to start next round</div>
-        <button style={overlayButtonStyle} onClick={togglePause}>Resume</button>
-      </div>
-
-      {/* Event banner fixed at bottom */}
       {eventMessage && <div style={getEventStyle(eventMessage.type)}>{eventMessage.text}</div>}
+
+      {roundOver && (
+        <LeaderboardTrigger
+          leaderboard={leaderboard}
+          playerName={playerName}
+          roundNumber={roundNumber}
+          onResume={togglePause}
+        />
+      )}
     </div>
   );
 }
