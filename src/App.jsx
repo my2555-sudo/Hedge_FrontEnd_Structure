@@ -9,6 +9,7 @@ import TotalPnLDisplay from "./components/TotalPnLDisplay.jsx";
 import GameController from "./components/GameController.jsx";
 import AICoachPanel from "./components/AICoachPanel.jsx";
 import FeedbackModal from "./components/FeedbackModal.jsx";
+import StatsDashboard from "./components/StatsDashboard.jsx";
 
 import { initialPortfolio } from "./data/mockPortfolio.js";
 import { EventProvider, useEventBus } from "./components/EventContext.jsx";
@@ -48,6 +49,11 @@ function AppInner() {
   // Feedback modal state
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
   const [feedbackMode, setFeedbackMode] = useState("serious"); // "serious" or "playful"
+
+  // Stats tracking
+  const [pnlHistory, setPnlHistory] = useState([]); // [{timestamp, pnl}]
+  const [streak, setStreak] = useState(0); // Survival streak
+  const lastRoundPnLRef = useRef(0);
 
   // ensure we only apply each event once to portfolio
   const lastAppliedIdRef = useRef(null);
@@ -163,6 +169,21 @@ function AppInner() {
     [portfolio]
   );
 
+  // Track P/L history for dashboard
+  useEffect(() => {
+    if (roundActive) {
+      const interval = setInterval(() => {
+        setPnlHistory((prev) => {
+          const newEntry = { timestamp: Date.now(), pnl: totalPnL };
+          // Keep last 100 entries
+          return [newEntry, ...prev].slice(0, 100);
+        });
+      }, 5000); // Update every 5 seconds during active rounds
+      
+      return () => clearInterval(interval);
+    }
+  }, [roundActive, totalPnL]);
+
   // 回合控制
   function startRound() {
     setLastEvent(null);
@@ -170,7 +191,16 @@ function AppInner() {
     setSecondsLeft(ROUND_SECONDS);
     lastAppliedIdRef.current = null;
     setRoundActive(true);
+    lastRoundPnLRef.current = totalPnL;
   }
+  
+  // Track streak based on round survival (simple: if P/L improved or stayed positive)
+  useEffect(() => {
+    if (!roundActive && secondsLeft <= 0 && lastRoundPnLRef.current !== undefined) {
+      const survived = totalPnL >= lastRoundPnLRef.current || totalPnL >= 0;
+      setStreak((prev) => survived ? prev + 1 : 0);
+    }
+  }, [roundActive, secondsLeft, totalPnL]);
   function pauseRound() {
     setRoundActive(false);
   }
@@ -252,6 +282,15 @@ function AppInner() {
             Market impact: {(pctImpact * 100).toFixed(1)}%
           </div>
         )}
+        
+        {/* Stats Dashboard */}
+        <StatsDashboard
+          totalPnL={totalPnL}
+          portfolioValue={portfolio.reduce((sum, r) => sum + (r.price * r.shares), 0) + cash}
+          initialValue={STARTING_CASH}
+          streak={streak}
+          pnlHistory={pnlHistory}
+        />
       </section>
 
       {/* Feedback Modal */}
