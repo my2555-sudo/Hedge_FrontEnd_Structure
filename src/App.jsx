@@ -243,16 +243,89 @@ function AppInner() {
           portfolio={portfolio}
           recentTrades={recentTrades}
           tradesSinceLastEvent={tradesSinceLastEvent}
+          feedbackMode={feedbackMode}
         />
+        
+        {/* Feedback Mode Toggle */}
+        <div style={{
+          marginTop: 12,
+          padding: "8px",
+          background: "rgba(255,255,255,0.05)",
+          borderRadius: "6px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "8px"
+        }}>
+          <span style={{ fontSize: "11px", opacity: 0.8 }}>Feedback Mode:</span>
+          <button
+            onClick={() => setFeedbackMode(prev => prev === "serious" ? "playful" : "serious")}
+            style={{
+              flex: 1,
+              padding: "6px 12px",
+              background: feedbackMode === "serious" 
+                ? "rgba(79, 195, 247, 0.3)" 
+                : "rgba(255,255,255,0.1)",
+              border: `1px solid ${feedbackMode === "serious" ? "var(--accent)" : "rgba(255,255,255,0.2)"}`,
+              borderRadius: "4px",
+              color: "white",
+              fontSize: "11px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              fontWeight: feedbackMode === "serious" ? 600 : 400
+            }}
+            onMouseOver={(e) => {
+              if (feedbackMode !== "serious") {
+                e.target.style.background = "rgba(255,255,255,0.15)";
+              }
+            }}
+            onMouseOut={(e) => {
+              if (feedbackMode !== "serious") {
+                e.target.style.background = "rgba(255,255,255,0.1)";
+              }
+            }}
+          >
+            📊 Serious
+          </button>
+          <button
+            onClick={() => setFeedbackMode(prev => prev === "playful" ? "serious" : "playful")}
+            style={{
+              flex: 1,
+              padding: "6px 12px",
+              background: feedbackMode === "playful" 
+                ? "rgba(255, 193, 7, 0.3)" 
+                : "rgba(255,255,255,0.1)",
+              border: `1px solid ${feedbackMode === "playful" ? "#ffc107" : "rgba(255,255,255,0.2)"}`,
+              borderRadius: "4px",
+              color: "white",
+              fontSize: "11px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              fontWeight: feedbackMode === "playful" ? 600 : 400
+            }}
+            onMouseOver={(e) => {
+              if (feedbackMode !== "playful") {
+                e.target.style.background = "rgba(255,255,255,0.15)";
+              }
+            }}
+            onMouseOut={(e) => {
+              if (feedbackMode !== "playful") {
+                e.target.style.background = "rgba(255,255,255,0.1)";
+              }
+            }}
+          >
+            🎮 Playful
+          </button>
+        </div>
         
         {/* Feedback button */}
         {lastEvent && (
           <button 
             className="btn" 
             onClick={() => setFeedbackModalOpen(true)}
-            style={{ marginTop: 12, width: "100%" }}
+            style={{ marginTop: 8, width: "100%" }}
           >
-            💡 Get Feedback
+            💡 Get Feedback ({feedbackMode === "serious" ? "📊" : "🎮"})
           </button>
         )}
       </section>

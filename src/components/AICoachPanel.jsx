@@ -6,7 +6,8 @@ export default function AICoachPanel({
   totalPnL, 
   portfolio = [],
   recentTrades = [],
-  tradesSinceLastEvent = 0
+  tradesSinceLastEvent = 0,
+  feedbackMode = "serious"
 }) {
   // Analyze player reaction to the last event
   const playerReaction = useMemo(() => {
@@ -68,7 +69,12 @@ export default function AICoachPanel({
 
   return (
     <div className="glass" style={{padding:"12px"}}>
-      <div className="PanelTitle">AI COACH</div>
+      <div className="PanelTitle">
+        AI COACH 
+        <span style={{ fontSize: "10px", opacity: 0.7, marginLeft: "8px" }}>
+          {feedbackMode === "serious" ? "📊" : "🎮"}
+        </span>
+      </div>
       <div style={{padding:"8px 12px"}}>
         {/* Event Summary */}
         {lastEvent ? (
