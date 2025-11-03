@@ -8,6 +8,7 @@ import TradeControls from "./components/TradeControls.jsx";
 import TotalPnLDisplay from "./components/TotalPnLDisplay.jsx";
 import GameController from "./components/GameController.jsx";
 import AICoachPanel from "./components/AICoachPanel.jsx";
+import FeedbackModal from "./components/FeedbackModal.jsx";
 
 import { initialPortfolio } from "./data/mockPortfolio.js";
 import { EventProvider, useEventBus } from "./components/EventContext.jsx";
@@ -43,6 +44,10 @@ function AppInner() {
   const [recentTrades, setRecentTrades] = useState([]); // [{action, ticker, qty, timestamp, eventId}]
   const [tradesSinceLastEvent, setTradesSinceLastEvent] = useState(0);
   const lastEventIdRef = useRef(null);
+
+  // Feedback modal state
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackMode, setFeedbackMode] = useState("serious"); // "serious" or "playful"
 
   // ensure we only apply each event once to portfolio
   const lastAppliedIdRef = useRef(null);
@@ -209,6 +214,17 @@ function AppInner() {
           recentTrades={recentTrades}
           tradesSinceLastEvent={tradesSinceLastEvent}
         />
+        
+        {/* Feedback button */}
+        {lastEvent && (
+          <button 
+            className="btn" 
+            onClick={() => setFeedbackModalOpen(true)}
+            style={{ marginTop: 12, width: "100%" }}
+          >
+            💡 Get Feedback
+          </button>
+        )}
       </section>
 
       {/* Center column: global feed */}
@@ -237,6 +253,17 @@ function AppInner() {
           </div>
         )}
       </section>
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        open={feedbackModalOpen}
+        lastEvent={lastEvent}
+        portfolio={portfolio}
+        totalPnL={totalPnL}
+        recentTrades={recentTrades}
+        mode={feedbackMode}
+        onClose={() => setFeedbackModalOpen(false)}
+      />
     </div>
   );
 }
