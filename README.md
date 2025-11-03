@@ -1,16 +1,22 @@
-# React + Vite
+# HEDGE
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Team & Contributions
+- Cynthia: Developed the interface for viewing holdings, executing trades, and displaying live P/L updates.
+- Amy: Implemented the real-time news ticker and randomized event engine that drive gameplay.
+- Harsh: Controlled game pacing, round logic, and scoring.
+- Uditi: Provided post-round behavioral analysis, feedback, and performance visualization.
 
-Currently, two official plugins are available:
+## What It Does
+Hedge is a simulated financial trading platform that allows beginner investors to explore the workings of the stock market by making artificial trades (buy and sell orders) in a specified amount of time (5, 10, or 15 minutes). Occasionally, Black Swan events will occur that cause stock prices for jump or fall, and the player will have to adjust their trades accordingly. They will also receive feedback during the game from an AI coach and will be able to see their net P/L.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Setup
+1. `npm install`
+2. `npm run dev`
 
-## React Compiler
+## Mock Data
+Our app uses mock data for:
+1. Black Swan events that will occur regularly (`mockEvents.js`).
+2. AI coach feedback that will appear when positive or negative trading attributes are detected (`mockFeedback.js`).
+3. Company tickers, prices, and # of shares at start (`mockPortfolio.js`).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Next week, we will connect it to our backend APIs.
