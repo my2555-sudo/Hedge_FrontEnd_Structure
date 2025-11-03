@@ -73,7 +73,7 @@ export const seriousFeedback = {
 export const playfulFeedback = {
   [FEEDBACK_TYPES.PANIC_SELLING]: [
     "Whoa there, speed trader! 😅 Panic selling is like throwing all your chips away when the table gets hot. Take a breath and think strategy, not survival mode.",
-    "Hold up! That's a classic "sell the news" move, but maybe a bit too classic? Try diversification instead of the nuclear option.",
+    "Hold up! That's a classic 'sell the news' move, but maybe a bit too classic? Try diversification instead of the nuclear option.",
     "Panic mode activated? 🚨 Remember: the best traders make moves based on logic, not fear. Consider trimming, not nuking, your positions."
   ],
   [FEEDBACK_TYPES.OVER_CONCENTRATION]: [
