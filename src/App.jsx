@@ -39,6 +39,11 @@ function AppInner() {
   const [flashTicker, setFlashTicker] = useState(null);
   const [pctImpact, setPctImpact] = useState(0); // e.g. -0.03 => -3%
 
+  // Track player actions for AI Coach analysis
+  const [recentTrades, setRecentTrades] = useState([]); // [{action, ticker, qty, timestamp, eventId}]
+  const [tradesSinceLastEvent, setTradesSinceLastEvent] = useState(0);
+  const lastEventIdRef = useRef(null);
+
   // ensure we only apply each event once to portfolio
   const lastAppliedIdRef = useRef(null);
 
@@ -85,6 +90,10 @@ function AppInner() {
     setLastEvent(ev);
     setPctImpact(ev.impactPct || 0);
     applyImpacts(ev);
+    
+    // Reset trade tracking for new event
+    setTradesSinceLastEvent(0);
+    lastEventIdRef.current = ev.runtimeId;
   }, [events, roundActive]);
 
   // 交易（含现金校验）
@@ -123,6 +132,17 @@ function AppInner() {
         }
       })
     );
+
+    // Track trade for AI Coach analysis
+    const tradeRecord = {
+      action,
+      ticker,
+      qty,
+      timestamp: Date.now(),
+      eventId: lastEventIdRef.current
+    };
+    setRecentTrades((prev) => [tradeRecord, ...prev].slice(0, 10)); // Keep last 10 trades
+    setTradesSinceLastEvent((prev) => prev + 1);
 
     setFlashTicker(ticker);
     setTimeout(() => setFlashTicker(null), 400);
@@ -182,7 +202,13 @@ function AppInner() {
           </button>
         </div>
 
-        <AICoachPanel lastEvent={lastEvent} totalPnL={totalPnL} />
+        <AICoachPanel 
+          lastEvent={lastEvent} 
+          totalPnL={totalPnL}
+          portfolio={portfolio}
+          recentTrades={recentTrades}
+          tradesSinceLastEvent={tradesSinceLastEvent}
+        />
       </section>
 
       {/* Center column: global feed */}
