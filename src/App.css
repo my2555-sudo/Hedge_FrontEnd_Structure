@@ -169,3 +169,16 @@ body{
 .nf-headline { font-weight: 600; }
 .nf-time { font-size: 12px; opacity: 0.7; }
 
+.flash-row {
+  animation: flashAnim 0.4s ease;
+}
+
+@keyframes flashAnim {
+  0% {
+    background-color: rgba(109, 240, 255, 0.15);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+

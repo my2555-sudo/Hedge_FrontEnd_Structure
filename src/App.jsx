@@ -24,7 +24,20 @@ function AppInner() {
   // last event + portfolio
   const [lastEvent, setLastEvent] = useState(null);
   const [portfolio, setPortfolio] = useState(initialPortfolio); // [{ticker, price, shares, avgPrice}]
+
+  // [ADD] 
+  const STARTING_CASH = 10000;
+  const [cash, setCash] = useState(STARTING_CASH);
+
   const tickers = useMemo(() => portfolio.map((p) => p.ticker), [portfolio]);
+
+  const positionsMap = useMemo(
+    () => Object.fromEntries(portfolio.map(r => [r.ticker, r.shares])),
+    [portfolio]
+  );
+
+  const [flashTicker, setFlashTicker] = useState(null);
+
   const [pctImpact, setPctImpact] = useState(0); // e.g. -0.03 => -3%
 
   // ensure we only apply each event once to portfolio
@@ -74,21 +87,48 @@ function AppInner() {
 
   // trades
   function handleTrade({ ticker, action, qty }) {
-    setPortfolio((prev) =>
-      prev.map((row) => {
-        if (row.ticker !== ticker) return row;
-        const px = row.price;
-        if (action === "BUY") {
-          const newShares = row.shares + qty;
-          const newAvg = (row.avgPrice * row.shares + px * qty) / newShares;
-          return { ...row, shares: newShares, avgPrice: +newAvg.toFixed(2) };
-        } else {
-          const newShares = Math.max(0, row.shares - qty);
-          return { ...row, shares: newShares };
-        }
-      })
-    );
+  // 先找到该股票的现价，用于现金计算
+  const row = portfolio.find(r => r.ticker === ticker);
+  if (!row) return;
+  const px = row.price;
+
+  if (action === "BUY") {
+    const cost = px * qty;
+
+    // [ADD] 余额不足，拦截交易（你也可以改成在 UI 上提示）
+    if (cost > cash) {
+      alert(`Not enough cash to buy ${qty} ${ticker}. Need $${cost.toFixed(2)}, have $${cash.toFixed(2)}.`);
+      return;
+    }
+
+    // [ADD] 扣现金
+    setCash(prev => +(prev - cost).toFixed(2));
+  } else {
+    // [ADD] 卖出回收现金（按当前价格）
+    const proceeds = px * Math.min(qty, row.shares);
+    setCash(prev => +(prev + proceeds).toFixed(2));
   }
+
+  // 原有的持仓与均价更新
+  setPortfolio((prev) =>
+    prev.map((r) => {
+      if (r.ticker !== ticker) return r;
+      if (action === "BUY") {
+        const newShares = r.shares + qty;
+        const newAvg = (r.avgPrice * r.shares + px * qty) / newShares;
+        return { ...r, shares: newShares, avgPrice: +newAvg.toFixed(2) };
+      } else {
+        const newShares = Math.max(0, r.shares - qty);
+        return { ...r, shares: newShares };
+      }
+    })
+  );
+
+  // 行闪烁
+  setFlashTicker(ticker);
+  setTimeout(() => setFlashTicker(null), 400);
+}
+
 
   // P/L
   const totalPnL = useMemo(() =>
@@ -129,9 +169,15 @@ function AppInner() {
       {/* Right column: portfolio */}
       <section className="RightPortfolio glass">
         <div className="PanelTitle">PORTFOLIO</div>
-        <PortfolioTable rows={portfolio} />
-        <TradeControls tickers={tickers} onTrade={handleTrade} disabled={!roundActive} />
+         <PortfolioTable rows={portfolio} flashTicker={flashTicker} />
+         <TradeControls
+          tickers={tickers}
+          positions={positionsMap}
+          onTrade={handleTrade}
+          disabled={!roundActive}
+        />
         <TotalPnLDisplay value={totalPnL} />
+        <div className="CashDisplay">💵 Cash: ${cash.toFixed(2)}</div>
         {lastEvent && (
           <div className="ImpactBadge">Market impact: {(pctImpact * 100).toFixed(1)}%</div>
         )}
@@ -147,3 +193,4 @@ export default function App() {
     </EventProvider>
   );
 }
+
