@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { generateFeedback } from "../data/mockFeedback.js";
+import fetchCoachInsights from "../api/coachInsights.js";
 
 /**
  * FeedbackModal - Displays personalized AI feedback with 2-3 tips
@@ -22,6 +23,11 @@ export default function FeedbackModal({
   mode = "serious",
   onClose 
 }) {
+  const [aiTips, setAiTips] = useState([]);
+  const [aiStatus, setAiStatus] = useState("idle"); // idle | loading | success | error | disabled
+  const [aiError, setAiError] = useState(null);
+  const abortRef = useRef();
+
   // Determine player action based on recent trades
   const playerAction = useMemo(() => {
     if (!lastEvent) return "no_action";
@@ -61,6 +67,82 @@ export default function FeedbackModal({
       mode
     });
   }, [lastEvent, playerAction, portfolio, totalPnL, mode]);
+
+  const coachApiKey = import.meta.env.VITE_HF_API_KEY?.trim();
+
+  useEffect(() => {
+    if (!open) {
+      setAiStatus("idle");
+      setAiTips([]);
+      setAiError(null);
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = undefined;
+      }
+      return;
+    }
+
+    if (!coachApiKey) {
+      setAiStatus("disabled");
+      setAiTips([]);
+      setAiError(null);
+      return;
+    }
+
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const portfolioSnapshot =
+      portfolio && portfolio.length
+        ? portfolio
+            .slice(0, 5)
+            .map(
+              (holding) =>
+                `${holding.ticker}: ${holding.shares} @ $${holding.price.toFixed(
+                  2
+                )}`
+            )
+            .join(", ")
+        : "No active holdings";
+
+    const eventSummary = lastEvent
+      ? `${lastEvent.type} event "${lastEvent.title}" with base impact ${(lastEvent.impactPct * 100).toFixed(
+          2
+        )}%`
+      : "No recent event";
+
+    setAiStatus("loading");
+    setAiError(null);
+
+    fetchCoachInsights({
+      eventSummary,
+      playerAction,
+      portfolioSnapshot,
+      pnl: totalPnL,
+      mode,
+      apiKey: coachApiKey,
+      controller,
+    })
+      .then((tips) => {
+        if (!controller.signal.aborted) {
+          setAiTips(tips);
+          setAiStatus("success");
+        }
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setAiTips([]);
+        setAiStatus("error");
+        setAiError(error.message || "Unable to generate live coaching tips");
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [open, lastEvent, portfolio, totalPnL, playerAction, mode, coachApiKey]);
 
   if (!open) return null;
 
@@ -199,6 +281,79 @@ export default function FeedbackModal({
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Generative AI Tips */}
+        <div style={{ marginBottom: "20px" }}>
+          <div style={{ 
+            fontSize: "14px", 
+            fontWeight: 600, 
+            marginBottom: "12px",
+            color: "var(--accent, #4fc3f7)"
+          }}>
+            🤖 AI Coach (Live)
+          </div>
+          {!coachApiKey && (
+            <div style={{
+              fontSize: "12px",
+              opacity: 0.7,
+              padding: "12px",
+              background: "rgba(255,255,255,0.04)",
+              borderRadius: "8px",
+              border: "1px dashed rgba(255,255,255,0.15)"
+            }}>
+              Provide a Hugging Face API key in `VITE_HF_API_KEY` to enable live coaching tips. Showing rule-based suggestions above.
+            </div>
+          )}
+          {coachApiKey && aiStatus === "loading" && (
+            <div style={{
+              fontSize: "12px",
+              padding: "12px",
+              background: "rgba(79, 195, 247, 0.12)",
+              borderRadius: "8px",
+              border: "1px solid rgba(79,195,247,0.3)"
+            }}>
+              Generating personalized guidance…
+            </div>
+          )}
+          {coachApiKey && aiStatus === "error" && (
+            <div style={{
+              fontSize: "12px",
+              padding: "12px",
+              background: "rgba(220,53,69,0.12)",
+              borderRadius: "8px",
+              border: "1px solid rgba(220,53,69,0.4)"
+            }}>
+              {aiError || "Unable to load live coaching tips. Falling back to rule-based advice."}
+            </div>
+          )}
+          {coachApiKey && aiStatus === "success" && aiTips.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {aiTips.map((tip, index) => (
+                <div
+                  key={`ai-${index}`}
+                  style={{
+                    padding: "14px",
+                    background: "rgba(79,195,247,0.08)",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    lineHeight: "1.6",
+                    borderLeft: "3px solid rgba(79, 195, 247, 0.7)",
+                  }}
+                >
+                  <span style={{ 
+                    display: "inline-block",
+                    marginRight: "8px",
+                    fontWeight: 600,
+                    color: "var(--accent, #4fc3f7)"
+                  }}>
+                    {index + 1}.
+                  </span>
+                  {tip}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* P/L Summary */}
