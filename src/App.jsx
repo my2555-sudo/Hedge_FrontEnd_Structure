@@ -14,100 +14,75 @@ import StatsDashboard from "./components/StatsDashboard.jsx";
 import { initialPortfolio } from "./data/mockPortfolio.js";
 import { EventProvider, useEventBus } from "./components/EventContext.jsx";
 
+import { getOrCreateCurrentRound } from "./lib/round.js";
+
 function AppInner() {
-  // --- game state (top-level UI timer only) ---
   const ROUND_SECONDS = 30;
   const [secondsLeft, setSecondsLeft] = useState(ROUND_SECONDS);
   const [roundActive, setRoundActive] = useState(false);
 
-  // global event bus
   const { events } = useEventBus();
 
-  // last event + portfolio
   const [lastEvent, setLastEvent] = useState(null);
-  const [portfolio, setPortfolio] = useState(initialPortfolio); // [{ticker, price, shares, avgPrice, sector?}]
+  const [portfolio, setPortfolio] = useState(initialPortfolio);
 
-  // Cash 机制
   const STARTING_CASH = 10000;
   const [cash, setCash] = useState(STARTING_CASH);
 
   const tickers = useMemo(() => portfolio.map((p) => p.ticker), [portfolio]);
-
   const positionsMap = useMemo(
     () => Object.fromEntries(portfolio.map((r) => [r.ticker, r.shares])),
     [portfolio]
   );
 
   const [flashTicker, setFlashTicker] = useState(null);
-  const [pctImpact, setPctImpact] = useState(0); // e.g. -0.03 => -3%
+  const [pctImpact, setPctImpact] = useState(0);
 
-  // Track player actions for AI Coach analysis
-  const [recentTrades, setRecentTrades] = useState([]); // [{action, ticker, qty, timestamp, eventId}]
+  const [recentTrades, setRecentTrades] = useState([]);
   const [tradesSinceLastEvent, setTradesSinceLastEvent] = useState(0);
   const lastEventIdRef = useRef(null);
 
-  // Feedback modal state
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
-  const [feedbackMode, setFeedbackMode] = useState("serious"); // "serious" or "playful"
+  const [feedbackMode, setFeedbackMode] = useState("serious");
 
-  // Stats tracking
-  const [pnlHistory, setPnlHistory] = useState([]); // [{timestamp, pnl}]
-  const [streak, setStreak] = useState(0); // Survival streak
+  const [pnlHistory, setPnlHistory] = useState([]);
+  const [streak, setStreak] = useState(0);
   const lastRoundPnLRef = useRef(0);
 
-  // ensure we only apply each event once to portfolio
   const lastAppliedIdRef = useRef(null);
 
-  // === 统一应用价格冲击（全市场 + 行业 + 个股）===
   function applyImpacts(ev) {
     setPortfolio((prev) =>
       prev.map((row) => {
-        // 基线：全市场
         let pct = ev?.impactPct ?? 0;
-
-        // 叠加：行业（事件可选字段）
-        if (ev?.impacts?.sector && row.sector) {
-          pct += ev.impacts.sector[row.sector] ?? 0;
-        }
-
-        // 叠加：个股（事件可选字段）
-        if (ev?.impacts?.ticker) {
-          pct += ev.impacts.ticker[row.ticker] ?? 0;
-        }
-
+        if (ev?.impacts?.sector && row.sector) pct += ev.impacts.sector[row.sector] ?? 0;
+        if (ev?.impacts?.ticker) pct += ev.impacts.ticker[row.ticker] ?? 0;
         return { ...row, price: +(row.price * (1 + pct)).toFixed(2) };
       })
     );
   }
 
-  // 顶层 UI 倒计时（独立于 GameController 内部计时）
   useEffect(() => {
-    if (!roundActive) return;
-    if (secondsLeft <= 0) return;
+    if (!roundActive || secondsLeft <= 0) return;
     const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearTimeout(t);
   }, [roundActive, secondsLeft]);
 
-  // 有新事件到达时，仅应用一次价格冲击
   useEffect(() => {
     if (!roundActive) return;
     const ev = events[0];
     if (!ev) return;
-
-    // 防止重复应用同一事件
     if (lastAppliedIdRef.current === ev.runtimeId) return;
     lastAppliedIdRef.current = ev.runtimeId;
 
     setLastEvent(ev);
     setPctImpact(ev.impactPct || 0);
     applyImpacts(ev);
-    
-    // Reset trade tracking for new event
+
     setTradesSinceLastEvent(0);
     lastEventIdRef.current = ev.runtimeId;
   }, [events, roundActive]);
 
-  // 交易（含现金校验）
   function handleTrade({ ticker, action, qty }) {
     const row = portfolio.find((r) => r.ticker === ticker);
     if (!row) return;
@@ -116,11 +91,7 @@ function AppInner() {
     if (action === "BUY") {
       const cost = px * qty;
       if (cost > cash) {
-        alert(
-          `Not enough cash to buy ${qty} ${ticker}. Need $${cost.toFixed(
-            2
-          )}, have $${cash.toFixed(2)}.`
-        );
+        alert(`Not enough cash to buy ${qty} ${ticker}. Need $${cost.toFixed(2)}, have $${cash.toFixed(2)}.`);
         return;
       }
       setCash((prev) => +(prev - cost).toFixed(2));
@@ -144,47 +115,27 @@ function AppInner() {
       })
     );
 
-    // Track trade for AI Coach analysis
-    const tradeRecord = {
-      action,
-      ticker,
-      qty,
-      timestamp: Date.now(),
-      eventId: lastEventIdRef.current
-    };
-    setRecentTrades((prev) => [tradeRecord, ...prev].slice(0, 10)); // Keep last 10 trades
+    const tradeRecord = { action, ticker, qty, timestamp: Date.now(), eventId: lastEventIdRef.current };
+    setRecentTrades((prev) => [tradeRecord, ...prev].slice(0, 10));
     setTradesSinceLastEvent((prev) => prev + 1);
 
     setFlashTicker(ticker);
     setTimeout(() => setFlashTicker(null), 400);
   }
 
-  // 总 P/L
   const totalPnL = useMemo(
-    () =>
-      portfolio.reduce(
-        (sum, r) => sum + (r.price - r.avgPrice) * r.shares,
-        0
-      ),
+    () => portfolio.reduce((sum, r) => sum + (r.price - r.avgPrice) * r.shares, 0),
     [portfolio]
   );
 
-  // Track P/L history for dashboard
   useEffect(() => {
-    if (roundActive) {
-      const interval = setInterval(() => {
-        setPnlHistory((prev) => {
-          const newEntry = { timestamp: Date.now(), pnl: totalPnL };
-          // Keep last 100 entries
-          return [newEntry, ...prev].slice(0, 100);
-        });
-      }, 5000); // Update every 5 seconds during active rounds
-      
-      return () => clearInterval(interval);
-    }
+    if (!roundActive) return;
+    const id = setInterval(() => {
+      setPnlHistory((prev) => [{ timestamp: Date.now(), pnl: totalPnL }, ...prev].slice(0, 100));
+    }, 5000);
+    return () => clearInterval(id);
   }, [roundActive, totalPnL]);
 
-  // 回合控制
   function startRound() {
     setLastEvent(null);
     setPctImpact(0);
@@ -193,20 +144,16 @@ function AppInner() {
     setRoundActive(true);
     lastRoundPnLRef.current = totalPnL;
   }
-  
-  // Track streak based on round survival (simple: if P/L improved or stayed positive)
+
   useEffect(() => {
     if (!roundActive && secondsLeft <= 0 && lastRoundPnLRef.current !== undefined) {
       const survived = totalPnL >= lastRoundPnLRef.current || totalPnL >= 0;
-      setStreak((prev) => survived ? prev + 1 : 0);
+      setStreak((prev) => (survived ? prev + 1 : 0));
     }
   }, [roundActive, secondsLeft, totalPnL]);
-  function pauseRound() {
-    setRoundActive(false);
-  }
-  function resumeRound() {
-    if (secondsLeft > 0) setRoundActive(true);
-  }
+
+  function pauseRound() { setRoundActive(false); }
+  function resumeRound() { if (secondsLeft > 0) setRoundActive(true); }
 
   return (
     <div className="AppRoot">
@@ -218,119 +165,82 @@ function AppInner() {
         </div>
 
         <TimerDisplay seconds={secondsLeft} active={roundActive} />
-        {/* Drive GameController’s active state from here so BlackSwan hook runs */}
+        {/* Drive GameController from here so BlackSwan runs */}
         <GameController controlledActive={roundActive} />
 
         <div style={{ marginTop: 12 }}>
-          <button className="btn start" onClick={startRound}>
-            Start
-          </button>
-          <button className="btn pause" onClick={pauseRound} disabled={!roundActive}>
-            Pause
-          </button>
-          <button
-            className="btn resume"
-            onClick={resumeRound}
-            disabled={roundActive || secondsLeft <= 0}
-          >
-            Resume
-          </button>
+          <button className="btn start" onClick={startRound}>Start</button>
+          <button className="btn pause" onClick={pauseRound} disabled={!roundActive}>Pause</button>
+          <button className="btn resume" onClick={resumeRound} disabled={roundActive || secondsLeft <= 0}>Resume</button>
         </div>
 
-        <AICoachPanel 
-          lastEvent={lastEvent} 
+        <AICoachPanel
+          lastEvent={lastEvent}
           totalPnL={totalPnL}
           portfolio={portfolio}
           recentTrades={recentTrades}
           tradesSinceLastEvent={tradesSinceLastEvent}
           feedbackMode={feedbackMode}
         />
-        
+
         {/* Feedback Mode Toggle */}
-        <div style={{
-          marginTop: 12,
-          padding: "8px",
-          background: "rgba(255,255,255,0.05)",
-          borderRadius: "6px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "8px"
-        }}>
+        <div
+          style={{
+            marginTop: 12,
+            padding: "8px",
+            background: "rgba(255,255,255,0.05)",
+            borderRadius: "6px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "8px",
+          }}
+        >
           <span style={{ fontSize: "11px", opacity: 0.8 }}>Feedback Mode:</span>
           <button
-            onClick={() => setFeedbackMode(prev => prev === "serious" ? "playful" : "serious")}
+            onClick={() => setFeedbackMode((p) => (p === "serious" ? "playful" : "serious"))}
             style={{
               flex: 1,
               padding: "6px 12px",
-              background: feedbackMode === "serious" 
-                ? "rgba(79, 195, 247, 0.3)" 
-                : "rgba(255,255,255,0.1)",
+              background: feedbackMode === "serious" ? "rgba(79, 195, 247, 0.3)" : "rgba(255,255,255,0.1)",
               border: `1px solid ${feedbackMode === "serious" ? "var(--accent)" : "rgba(255,255,255,0.2)"}`,
               borderRadius: "4px",
               color: "white",
               fontSize: "11px",
               cursor: "pointer",
               transition: "all 0.2s",
-              fontWeight: feedbackMode === "serious" ? 600 : 400
-            }}
-            onMouseOver={(e) => {
-              if (feedbackMode !== "serious") {
-                e.target.style.background = "rgba(255,255,255,0.15)";
-              }
-            }}
-            onMouseOut={(e) => {
-              if (feedbackMode !== "serious") {
-                e.target.style.background = "rgba(255,255,255,0.1)";
-              }
+              fontWeight: feedbackMode === "serious" ? 600 : 400,
             }}
           >
             📊 Serious
           </button>
           <button
-            onClick={() => setFeedbackMode(prev => prev === "playful" ? "serious" : "playful")}
+            onClick={() => setFeedbackMode((p) => (p === "playful" ? "serious" : "playful"))}
             style={{
               flex: 1,
               padding: "6px 12px",
-              background: feedbackMode === "playful" 
-                ? "rgba(255, 193, 7, 0.3)" 
-                : "rgba(255,255,255,0.1)",
+              background: feedbackMode === "playful" ? "rgba(255, 193, 7, 0.3)" : "rgba(255,255,255,0.1)",
               border: `1px solid ${feedbackMode === "playful" ? "#ffc107" : "rgba(255,255,255,0.2)"}`,
               borderRadius: "4px",
               color: "white",
               fontSize: "11px",
               cursor: "pointer",
               transition: "all 0.2s",
-              fontWeight: feedbackMode === "playful" ? 600 : 400
-            }}
-            onMouseOver={(e) => {
-              if (feedbackMode !== "playful") {
-                e.target.style.background = "rgba(255,255,255,0.15)";
-              }
-            }}
-            onMouseOut={(e) => {
-              if (feedbackMode !== "playful") {
-                e.target.style.background = "rgba(255,255,255,0.1)";
-              }
+              fontWeight: feedbackMode === "playful" ? 600 : 400,
             }}
           >
             🎮 Playful
           </button>
         </div>
-        
-        {/* Feedback button */}
+
         {lastEvent && (
-          <button 
-            className="btn" 
-            onClick={() => setFeedbackModalOpen(true)}
-            style={{ marginTop: 8, width: "100%" }}
-          >
+          <button className="btn" onClick={() => setFeedbackModalOpen(true)} style={{ marginTop: 8, width: "100%" }}>
             💡 Get Feedback ({feedbackMode === "serious" ? "📊" : "🎮"})
           </button>
         )}
       </section>
 
-      {/* Center column: global feed */}
+      {/* Center column */}
       <section className="CenterFeed glass">
         <div className="PanelTitle">
           NEWS HEADLINES (AI) <span className="count">{events.length}</span>
@@ -338,7 +248,7 @@ function AppInner() {
         <NewsFeed events={events} onSelect={(ev) => setLastEvent(ev)} />
       </section>
 
-      {/* Right column: portfolio */}
+      {/* Right column */}
       <section className="RightPortfolio glass">
         <div className="PanelTitle">PORTFOLIO</div>
         <PortfolioTable rows={portfolio} flashTicker={flashTicker} />
@@ -350,23 +260,17 @@ function AppInner() {
         />
         <TotalPnLDisplay value={totalPnL} />
         <div className="CashDisplay">💵 Cash: ${cash.toFixed(2)}</div>
-        {lastEvent && (
-          <div className="ImpactBadge">
-            Market impact: {(pctImpact * 100).toFixed(1)}%
-          </div>
-        )}
-        
-        {/* Stats Dashboard */}
+        {lastEvent && <div className="ImpactBadge">Market impact: {(pctImpact * 100).toFixed(1)}%</div>}
+
         <StatsDashboard
           totalPnL={totalPnL}
-          portfolioValue={portfolio.reduce((sum, r) => sum + (r.price * r.shares), 0) + cash}
+          portfolioValue={portfolio.reduce((sum, r) => sum + r.price * r.shares, 0) + cash}
           initialValue={STARTING_CASH}
           streak={streak}
           pnlHistory={pnlHistory}
         />
       </section>
 
-      {/* Feedback Modal */}
       <FeedbackModal
         open={feedbackModalOpen}
         lastEvent={lastEvent}
@@ -380,9 +284,48 @@ function AppInner() {
   );
 }
 
+// ------------------------------
+// Wrapper: ensure a round exists and provide roundId to EventProvider
+// ------------------------------
 export default function App() {
+  const GAME_ID = Number(new URLSearchParams(window.location.search).get("game")) || 1;
+  const ROUND_SECONDS = 30;
+
+  const [roundId, setRoundId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const rid = await getOrCreateCurrentRound(GAME_ID, ROUND_SECONDS);
+        if (!cancelled) setRoundId(rid);
+      } catch (e) {
+        if (!cancelled) setErr(e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [GAME_ID]);
+
+  if (loading) return <div className="AppRoot" style={{ color: "#fff", padding: 24 }}>Loading round…</div>;
+
+  if (err || !roundId) {
+    return (
+      <div className="AppRoot" style={{ color: "#fff", padding: 24 }}>
+        {err ? `Failed to load/create round: ${err.message}` : "No round found or created."}
+        <div style={{ opacity: 0.7, marginTop: 6 }}>
+          Ensure RLS allows reading <code>rounds</code> and a <code>games</code> row exists for <code>id={GAME_ID}</code>.
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <EventProvider>
+    <EventProvider roundId={roundId}>
       <AppInner />
     </EventProvider>
   );
