@@ -22,8 +22,6 @@ export default function FeedbackModal({
   mode = "serious",
   onClose 
 }) {
-  if (!open) return null;
-
   // Determine player action based on recent trades
   const playerAction = useMemo(() => {
     if (!lastEvent) return "no_action";
@@ -63,6 +61,8 @@ export default function FeedbackModal({
       mode
     });
   }, [lastEvent, playerAction, portfolio, totalPnL, mode]);
+
+  if (!open) return null;
 
   const modeIcon = mode === "playful" ? "🎮" : "📊";
   const modeLabel = mode === "playful" ? "Playful Mode" : "Serious Mode";

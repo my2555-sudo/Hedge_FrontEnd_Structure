@@ -1,4 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
+import useMarketInsights from "../hooks/useMarketInsights.js";
 import { TITLES, calculateTitle } from "../gameLogic.js";
 
 /**
@@ -19,6 +20,15 @@ export default function StatsDashboard({
   pnlHistory = []
 }) {
   const [selectedTimeframe, setSelectedTimeframe] = useState("all");
+  const {
+    indexes,
+    sectors,
+    fearGreed,
+    loading: insightsLoading,
+    error: insightsError,
+    lastUpdated,
+    refresh: refreshInsights
+  } = useMarketInsights();
 
   // Calculate current title and next title progress
   const { currentTitle, nextTitle, progressToNext, unlockedTitles } = useMemo(() => {
@@ -155,6 +165,170 @@ export default function StatsDashboard({
             {currentTitle}
           </div>
         </div>
+      </div>
+
+      {/* Live Market Insights (API-powered) */}
+      <div style={{
+        marginBottom: "20px",
+        padding: "12px",
+        background: "rgba(255,255,255,0.04)",
+        borderRadius: "10px",
+        border: "1px solid rgba(255,255,255,0.08)"
+      }}>
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "12px"
+        }}>
+          <div style={{ fontSize: "13px", fontWeight: 600 }}>
+            🌐 Live Market Pulse
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {lastUpdated && (
+              <span style={{ fontSize: "10px", opacity: 0.6 }}>
+                Updated {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+            <button
+              onClick={refreshInsights}
+              style={{
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                color: "white",
+                borderRadius: "6px",
+                padding: "4px 8px",
+                fontSize: "10px",
+                cursor: "pointer"
+              }}
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {insightsError && (
+          <div style={{
+            fontSize: "11px",
+            color: "#ff6b6b",
+            background: "rgba(220,53,69,0.15)",
+            padding: "8px",
+            borderRadius: "6px",
+            marginBottom: "12px"
+          }}>
+            {insightsError} — showing latest sample data instead.
+          </div>
+        )}
+        <>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+              gap: "10px",
+              marginBottom: "14px"
+            }}>
+              {(insightsLoading && indexes.length === 0 ? Array.from({ length: 3 }) : indexes).map((index, idx) => {
+                const price = index?.price ?? index?.close ?? 0;
+                const rawChange = index?.changesPercentage ?? index?.changePercent ?? 0;
+                const change = Number(String(rawChange).replace("%", ""));
+                const isPositive = change >= 0;
+                return (
+                  <div
+                    key={index?.symbol || idx}
+                    style={{
+                      padding: "10px",
+                      background: "rgba(255,255,255,0.05)",
+                      borderRadius: "8px",
+                      border: `1px solid ${isPositive ? "rgba(40,167,69,0.25)" : "rgba(220,53,69,0.25)"}`,
+                      minHeight: "70px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between"
+                    }}
+                  >
+                    <div style={{ fontSize: "11px", opacity: 0.7 }}>
+                      {index?.name || "Market Index"}
+                    </div>
+                    <div style={{ fontSize: "16px", fontWeight: 700 }}>
+                      {insightsLoading && !index
+                        ? "···"
+                        : (
+                          <>
+                            ${Number(price).toFixed(2)}
+                            <span style={{
+                              fontSize: "11px",
+                              marginLeft: "6px",
+                              color: isPositive ? "var(--good)" : "var(--bad)"
+                            }}>
+                              {isPositive ? "+" : ""}{change.toFixed(2)}%
+                            </span>
+                          </>
+                        )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+              {fearGreed && (
+                <div style={{
+                  flex: "1 1 160px",
+                  padding: "10px",
+                  background: "rgba(255,255,255,0.05)",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.1)"
+                }}>
+                  <div style={{ fontSize: "11px", opacity: 0.7, marginBottom: "4px" }}>
+                    Sentiment (Fear & Greed)
+                  </div>
+                  <div style={{ fontSize: "22px", fontWeight: 700 }}>
+                    {fearGreed.value}
+                  </div>
+                  <div style={{ fontSize: "11px", opacity: 0.7 }}>
+                    {fearGreed.classification}
+                  </div>
+                </div>
+              )}
+
+              {sectors.length > 0 && (
+                <div style={{
+                  flex: "2 1 220px",
+                  padding: "10px",
+                  background: "rgba(255,255,255,0.05)",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.1)"
+                }}>
+                  <div style={{ fontSize: "11px", opacity: 0.7, marginBottom: "6px" }}>
+                    Leading Sectors
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {sectors.map((sector, idx) => {
+                      const isPositive = sector.change >= 0;
+                      return (
+                        <div
+                          key={sector.name || idx}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: "11px",
+                            background: "rgba(0,0,0,0.2)",
+                            padding: "6px 8px",
+                            borderRadius: "6px",
+                            border: `1px solid ${isPositive ? "rgba(40,167,69,0.2)" : "rgba(220,53,69,0.2)"}`
+                          }}
+                        >
+                          <span>{sector.name}</span>
+                          <span style={{ color: isPositive ? "var(--good)" : "var(--bad)" }}>
+                            {isPositive ? "+" : ""}{sector.change.toFixed(2)}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
       </div>
 
       {/* P/L Trend Chart */}

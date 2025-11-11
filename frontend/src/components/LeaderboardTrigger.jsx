@@ -87,6 +87,7 @@ export default function LeaderboardTrigger({ leaderboard, playerName, roundNumbe
                 const rank = index + 1;
                 const isTop = rank === 1;
                 const isEven = index % 2 === 0;
+                const isPlayer = entry.playerName === playerName;
 
                 return (
                   <tr
@@ -98,6 +99,7 @@ export default function LeaderboardTrigger({ leaderboard, playerName, roundNumbe
                         ? "#222"
                         : "#2b2b2b",
                       boxShadow: isTop ? "0 0 20px #FFD700" : "none",
+                      outline: isPlayer ? "2px solid rgba(79, 195, 247, 0.6)" : "none",
                       animation: visible ? `fadeSlideIn 0.6s ease ${0.15 * index}s both` : "none",
                       transition: "background-color 0.3s ease, box-shadow 0.3s ease",
                     }}
@@ -117,6 +119,11 @@ export default function LeaderboardTrigger({ leaderboard, playerName, roundNumbe
                     </td>
                     <td style={{ textAlign: "left", padding: "10px 12px", fontWeight: "500" }}>
                       {entry.playerName}
+                      {isPlayer && (
+                        <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--accent, #4fc3f7)" }}>
+                          (You)
+                        </span>
+                      )}
                     </td>
                     <td style={{ textAlign: "center", padding: "10px 12px", fontStyle: "italic" }}>
                       {entry.title}

@@ -24,8 +24,6 @@ export default function AICoachPanel({
     
     const sells = eventTrades.filter(t => t.action === "SELL").length;
     const buys = eventTrades.filter(t => t.action === "BUY").length;
-    const totalVolume = eventTrades.reduce((sum, t) => sum + t.qty, 0);
-    
     if (sells > buys && sells >= 2) {
       return "Rapid selling detected";
     } else if (buys > sells && buys >= 2) {

@@ -135,7 +135,6 @@ export const playfulFeedback = {
  */
 export function generateFeedback({ lastEvent, playerAction, portfolio, totalPnL, mode = "serious" }) {
   const feedbackPool = mode === "playful" ? playfulFeedback : seriousFeedback;
-  const tips = [];
   
   // Analyze portfolio concentration
   const sectorCounts = {};

@@ -127,12 +127,12 @@ export default function GameController({
     onEvent: (ev) => {
       setBsOccurredThisRound(true);
       setBlackSwan(ev);       // open modal
-      handleEvent(ev, { isBlackSwan: true });
+      handleEvent(ev);
     },
   });
 
   // --- Handle event impact & publish to feed ---
-  function handleEvent(event, opts = {}) {
+  function handleEvent(event) {
     setGameState((prev) => {
       if (!prev) return prev;
 
