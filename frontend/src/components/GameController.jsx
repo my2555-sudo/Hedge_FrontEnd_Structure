@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { applyRound, getGameState, resetGame, ROUND_DURATION } from "../gameLogic";
-import { nextEvent } from "../data/mockEvents";
+import { generateEvent } from "../api/events";
+import { nextEvent } from "../data/mockEvents"; // Fallback if API fails
 import LeaderboardTrigger from "./LeaderboardTrigger";
 import { useEventBus } from "./EventContext.jsx";
 import { useBlackSwan } from "./useBlackSwan";
@@ -100,11 +101,27 @@ export default function GameController({
 
     let cancelled = false;
 
-    const scheduleEvent = () => {
+    async function fetchEventFromAPI() {
+      try {
+        // Randomly choose MACRO or MICRO (or let backend decide)
+        const eventType = Math.random() < 0.5 ? "MACRO" : "MICRO";
+        const result = await generateEvent({ type: eventType });
+        if (result.success && result.event) {
+          return result.event;
+        }
+      } catch (error) {
+        console.warn("Backend API failed, falling back to mock data:", error);
+      }
+      // Fallback to mock data if API fails
+      return nextEvent();
+    }
+
+    const scheduleEvent = async () => {
       if (cancelled) return;
 
       if (!paused && !roundOver && Math.random() < NEWS_FIRE_PROB) {
-        handleEvent(nextEvent());
+        const event = await fetchEventFromAPI();
+        handleEvent(event);
       }
       const nextTimeout = NEWS_MIN_MS + Math.random() * (NEWS_MAX_MS - NEWS_MIN_MS); 
       loopRef.current.timeoutId = setTimeout(scheduleEvent, nextTimeout);
@@ -124,6 +141,7 @@ export default function GameController({
   useBlackSwan({
     active: isActive && emitEvents,
     meanIntervalSec: 120, // avg every ~2 minutes (bounded in hook)
+    useBackendAPI: true,  // Use backend API for blackswan events
     onEvent: (ev) => {
       setBsOccurredThisRound(true);
       setBlackSwan(ev);       // open modal
@@ -198,7 +216,19 @@ export default function GameController({
     setBlackSwan(null);
 
     // kick off with one immediate event so feed isn't empty
-    try { handleEvent(nextEvent()); } catch (e) { console.error(e); }
+    generateEvent({ type: "MACRO" })
+      .then((result) => {
+        if (result.success && result.event) {
+          handleEvent(result.event);
+        } else {
+          // Fallback to mock data
+          handleEvent(nextEvent());
+        }
+      })
+      .catch((error) => {
+        console.warn("Backend API failed on game start, using mock data:", error);
+        handleEvent(nextEvent());
+      });
   };
 
   const stopGame = () => {

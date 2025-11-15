@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { nextBlackSwan } from "../data/mockEvents";
+import { generateEvent } from "../api/events";
+import { nextBlackSwan } from "../data/mockEvents"; // Fallback if API fails
 
 function sampleDelayMs(meanSec, minSec = 45, maxSec = 180) {
   const u = Math.random();
@@ -7,7 +8,7 @@ function sampleDelayMs(meanSec, minSec = 45, maxSec = 180) {
   return Math.max(minSec, Math.min(exp, maxSec)) * 1000;
 }
 
-export function useBlackSwan({ active, onEvent, meanIntervalSec = 45 } = {}) {
+export function useBlackSwan({ active, onEvent, meanIntervalSec = 45, useBackendAPI = true } = {}) {
   const timerRef = useRef(null);
   const runningRef = useRef(false);
 
@@ -21,10 +22,30 @@ export function useBlackSwan({ active, onEvent, meanIntervalSec = 45 } = {}) {
     if (runningRef.current) return;
     runningRef.current = true;
 
+    async function fetchBlackSwanFromAPI() {
+      if (useBackendAPI) {
+        try {
+          const result = await generateEvent({ forceBlackSwan: true });
+          if (result.success && result.event) {
+            return result.event;
+          }
+        } catch (error) {
+          console.warn("Backend API failed for blackswan, falling back to mock data:", error);
+        }
+      }
+      // Fallback to mock data if API fails or useBackendAPI is false
+      return nextBlackSwan();
+    }
+
     const schedule = () => {
       const delay = sampleDelayMs(meanIntervalSec);
-      timerRef.current = setTimeout(() => {
-        try { onEvent?.(nextBlackSwan()); } catch (e) { console.error(e); }
+      timerRef.current = setTimeout(async () => {
+        try {
+          const event = await fetchBlackSwanFromAPI();
+          onEvent?.(event);
+        } catch (e) {
+          console.error(e);
+        }
         schedule();
       }, delay);
     };
@@ -34,5 +55,5 @@ export function useBlackSwan({ active, onEvent, meanIntervalSec = 45 } = {}) {
       if (timerRef.current) clearTimeout(timerRef.current);
       runningRef.current = false;
     };
-  }, [active, onEvent, meanIntervalSec]);
+  }, [active, onEvent, meanIntervalSec, useBackendAPI]);
 }

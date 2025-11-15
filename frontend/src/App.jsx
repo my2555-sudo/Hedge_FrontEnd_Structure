@@ -13,8 +13,32 @@ import StatsDashboard from "./components/StatsDashboard.jsx";
 
 import { initialPortfolio } from "./data/mockPortfolio.js";
 import { EventProvider, useEventBus } from "./components/EventContext.jsx";
+import { useAuth } from "./contexts/AuthContext.jsx";
+import LoginPage from "./components/LoginPage.jsx";
 
 function AppInner() {
+  const { user, profile, loading, signOut } = useAuth();
+
+  // Show login page if not authenticated
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white'
+      }}>
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
   // --- game state (top-level UI timer only) ---
   const ROUND_SECONDS = 30;
   const [secondsLeft, setSecondsLeft] = useState(ROUND_SECONDS);
@@ -216,6 +240,40 @@ function AppInner() {
           <div className="AvatarCircle">🙂</div>
           <div className="GameTitle">HEDGE</div>
         </div>
+        
+        {/* User Info */}
+        {profile && (
+          <div style={{ 
+            marginTop: 12, 
+            padding: 8, 
+            background: 'rgba(255,255,255,0.05)', 
+            borderRadius: 6,
+            fontSize: 12
+          }}>
+            <div style={{ opacity: 0.9 }}>👤 {profile.username || profile.full_name}</div>
+            {profile.full_name && profile.full_name !== profile.username && (
+              <div style={{ opacity: 0.7, marginTop: 4 }}>{profile.full_name}</div>
+            )}
+            <button
+              onClick={async () => {
+                await signOut();
+              }}
+              style={{
+                marginTop: 8,
+                padding: '4px 8px',
+                fontSize: 10,
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 4,
+                color: 'white',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
 
         <TimerDisplay seconds={secondsLeft} active={roundActive} />
         {/* Drive GameController’s active state from here so BlackSwan hook runs */}
