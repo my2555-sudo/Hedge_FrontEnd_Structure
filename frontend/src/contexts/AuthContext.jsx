@@ -8,12 +8,38 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const ensureProfileExists = async (authUser) => {
+    try {
+      // Check if profile exists
+      const { data: existing, error: fetchErr } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', authUser.id)
+        .maybeSingle()
+      if (fetchErr) throw fetchErr
+      if (existing) return
+      // Derive values from user metadata or email local part
+      const meta = authUser.user_metadata || {}
+      const emailLocal = (authUser.email || '').split('@')[0]
+      const username = meta.username || emailLocal || `user_${authUser.id.slice(0, 8)}`
+      const fullName = meta.full_name || username
+      // Upsert profile (RLS passes because session exists)
+      const { error: upsertErr } = await supabase.from('profiles').upsert(
+        [{ id: authUser.id, username, full_name: fullName }],
+        { onConflict: 'id' }
+      )
+      if (upsertErr) throw upsertErr
+    } catch (e) {
+      console.error('ensureProfileExists error:', e)
+    }
+  }
+
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       if (session?.user) {
-        fetchProfile(session.user.id)
+        ensureProfileExists(session.user).finally(() => fetchProfile(session.user.id))
       } else {
         setLoading(false)
       }
@@ -25,7 +51,7 @@ export function AuthProvider({ children }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       if (session?.user) {
-        fetchProfile(session.user.id)
+        ensureProfileExists(session.user).finally(() => fetchProfile(session.user.id))
       } else {
         setProfile(null)
         setLoading(false)
@@ -59,26 +85,20 @@ export function AuthProvider({ children }) {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            username,
+            full_name: fullName || username,
+          },
+        },
       })
 
       if (authError) throw authError
 
-      // Create profile in profiles table
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: authData.user.id,
-              username: username,
-              full_name: fullName || username,
-            },
-          ])
-
-        if (profileError) throw profileError
-
-        // Fetch the created profile
-        await fetchProfile(authData.user.id)
+      // If email confirmations are disabled and session exists, ensure profile now
+      if (authData.session?.user) {
+        await ensureProfileExists(authData.session.user)
+        await fetchProfile(authData.session.user.id)
       }
 
       return { success: true, user: authData.user }
@@ -98,6 +118,7 @@ export function AuthProvider({ children }) {
       if (error) throw error
 
       if (data.user) {
+        await ensureProfileExists(data.user)
         await fetchProfile(data.user.id)
       }
 

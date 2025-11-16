@@ -31,47 +31,83 @@ def _pick_random(arr: List[dict]) -> dict:
     """Pick a random item from a list."""
     return random.choice(arr)
 
+def _get_or_create_round_id() -> int:
+    """
+    Resolve a valid round_id to satisfy FK:
+    - Try latest round id from public.rounds
+    - If none exists, create a default one with id=1
+    """
+    supabase = get_supabase_client()
+    try:
+        res = supabase.table("rounds").select("id").order("id", desc=True).limit(1).execute()
+        if res.data and len(res.data) > 0 and res.data[0].get("id") is not None:
+            return int(res.data[0]["id"])
+        # Create a default round if table exists but empty
+        try:
+            create_res = supabase.table("rounds").insert({"id": 1, "game_id": 1, "round_no": 1}).execute()
+            # If created, return 1; if conflict, still use 1
+            return 1
+        except Exception:
+            return 1
+    except Exception:
+        # If rounds table not accessible, fallback to 1
+        return 1
+def _map_event_type_for_enum(event_type: str) -> str:
+    """
+    Map internal event type to DB enum expected values.
+    If enum doesn't support BLACK SWAN, fall back to MICRO.
+    """
+    if event_type == "BLACKSWAN":
+        return "MICRO"
+    return event_type
 
 def _event_to_db_dict(event: Event, round_id: Optional[int] = None, target_ticker_id: Optional[int] = None) -> dict:
     """
     Convert Event model to database dictionary format.
-    Maps to existing Supabase table structure:
-    - headline (text) <- title
-    - description (text) <- details
-    - etype/event_type (text) <- type
-    - severity (text) <- derived from impact_pct
-    - round_id (int8) <- optional, can be None
-    - target_ticker_id (int8) <- optional, can be None
-    - impulse_pct (numeric) <- baseImpactPct
-    - impact_pct (numeric) <- impactPct
+    Maps to schema defined in database/schema.sql:
+    - event_id (text)
+    - type (text)
+    - title (text)
+    - base_impact_pct (numeric)
+    - impact_pct (numeric)
+    - icon (text)
+    - tags (text[])
+    - runtime_id (text)
+    - ts (bigint)
+    - details (text)
     """
-    # Determine severity based on impact percentage
-    impact_abs = abs(event.impactPct)
+    mapped_type = _map_event_type_for_enum(event.type)
+    # derive severity for legacy schemas
+    impact_abs = abs(float(event.impactPct))
     if event.type == "BLACKSWAN":
         severity = "HIGH"
-    elif impact_abs >= 0.02:  # >= 2%
+    elif impact_abs >= 0.02:
         severity = "HIGH"
-    elif impact_abs >= 0.01:  # >= 1%
+    elif impact_abs >= 0.01:
         severity = "NORMAL"
     else:
         severity = "LOW"
-    
     db_dict = {
-        "headline": event.title,
-        "description": event.details or f"{event.title} - Market impact: {event.impactPct * 100:.2f}%",
-        "etype": event.type,  # Based on your table structure
+        "event_id": event.id,
+        "type": event.type,
+        "etype": mapped_type,  # compatibility for older schema (enum limited to MACRO/MICRO)
         "severity": severity,
-        "impulse_pct": float(event.baseImpactPct),  # Base impact percentage
-        "impact_pct": float(event.impactPct),  # Calculated impact with jitter
+        "title": event.title,
+        "headline": event.title,  # compatibility for older schema
+        "base_impact_pct": float(event.baseImpactPct),
+        "impulse_pct": float(event.baseImpactPct),  # compatibility for older schema
+        "impact_pct": float(event.impactPct),
+        "icon": event.icon,
+        "tags": event.tags or [],
+        "runtime_id": event.runtimeId,
+        "ts": int(event.ts),
+        "details": event.details or f"{event.title} - Market impact: {event.impactPct * 100:.2f}%",
+        "description": event.details or f"{event.title} - Market impact: {event.impactPct * 100:.2f}%",  # compatibility
     }
-    
-    # Only include optional fields if they're provided
     if round_id is not None:
         db_dict["round_id"] = round_id
-    
     if target_ticker_id is not None:
         db_dict["target_ticker_id"] = target_ticker_id
-    
     return db_dict
 
 
@@ -80,19 +116,15 @@ def _db_dict_to_event(db_dict: dict) -> Event:
     Convert database dictionary to Event model.
     Maps from existing Supabase table structure to Event model.
     """
-    # Extract event type (could be "etype" or "event_type")
-    event_type = db_dict.get("etype") or db_dict.get("event_type") or db_dict.get("type", "MACRO")
-    
-    # Extract headline/title
-    title = db_dict.get("headline") or db_dict.get("title", "")
-    
+    # Extract event type (prefer 'type' per schema)
+    event_type = db_dict.get("type") or db_dict.get("etype") or db_dict.get("event_type") or db_dict.get("type", "MACRO")
+    # Extract title
+    title = db_dict.get("title") or db_dict.get("headline", "")
     # Extract description/details
-    details = db_dict.get("description") or db_dict.get("details")
-    
-    # Generate a runtime ID if not present (for compatibility)
+    details = db_dict.get("details") or db_dict.get("description")
+    # Runtime id
     runtime_id = db_dict.get("runtime_id") or f"event-{db_dict.get('id', 'unknown')}-{int(time.time() * 1000)}"
-    
-    # Extract timestamp (use created_at if ts not available)
+    # Timestamp
     ts = db_dict.get("ts")
     if not ts and db_dict.get("created_at"):
         # Convert created_at timestamp to milliseconds
@@ -105,20 +137,13 @@ def _db_dict_to_event(db_dict: dict) -> Event:
     if not ts:
         ts = int(time.time() * 1000)
     
-    # Get impact_pct from database (preferred) or estimate from severity
+    # Get impact_pct from database (preferred) or estimate
     impact_pct = db_dict.get("impact_pct")
     if impact_pct is None:
-        # Estimate impact from severity if not available
-        severity = db_dict.get("severity") or db_dict.get("event_severity", "NORMAL")
-        if severity == "HIGH":
-            impact_pct = -0.05 if event_type == "BLACKSWAN" else -0.02
-        elif severity == "LOW":
-            impact_pct = -0.005
-        else:  # NORMAL
-            impact_pct = -0.01
+        impact_pct = db_dict.get("base_impact_pct") or 0
     
-    # Get base_impact_pct (impulse_pct) from database or use impact_pct as fallback
-    base_impact_pct = db_dict.get("impulse_pct") or db_dict.get("base_impact_pct")
+    # Get base_impact_pct
+    base_impact_pct = db_dict.get("base_impact_pct") or db_dict.get("impulse_pct")
     if base_impact_pct is None:
         base_impact_pct = impact_pct  # Use impact_pct as fallback
     
@@ -204,8 +229,9 @@ def generate_event(event_type: Optional[EventType] = None, force_blackswan: bool
     
     # Store the event in Supabase
     try:
-        # Note: round_id and target_ticker_id are optional - set to None if not in a specific round/ticker
-        db_dict = _event_to_db_dict(event, round_id=None, target_ticker_id=None)
+        # Use latest round id (with safe fallback) to satisfy FK/NOT NULL
+        resolved_round_id = _get_or_create_round_id()
+        db_dict = _event_to_db_dict(event, round_id=resolved_round_id, target_ticker_id=None)
         result = supabase.table("events").insert(db_dict).execute()
         if not result.data:
             print(f"Warning: Event inserted but no data returned: {runtime_id}")
@@ -231,16 +257,14 @@ def get_all_events(limit: Optional[int] = None, event_type: Optional[EventType] 
     supabase = get_supabase_client()
     
     try:
-        # Use "created_at" for ordering if "ts" column doesn't exist
-        # Try ordering by id (descending) as fallback
         query = supabase.table("events").select("*")
         
         # Order by id (descending for most recent first)
         query = query.order("id", desc=True)
         
-        # Filter by type if specified (using "etype" based on your table structure)
+        # Filter by type if specified
         if event_type:
-            query = query.eq("etype", event_type)
+            query = query.eq("type", event_type)
         
         # Apply limit
         if limit:
@@ -297,9 +321,8 @@ def get_blackswan_events(limit: Optional[int] = None) -> List[Event]:
     try:
         query = supabase.table("events").select("*")
         
-        # Filter by BLACKSWAN type (or high severity as fallback)
-        # First try to filter by etype="BLACKSWAN", if no results, try severity="HIGH"
-        query = query.eq("etype", "BLACKSWAN")
+        # Filter by BLACKSWAN type
+        query = query.eq("type", "BLACKSWAN")
         
         # Order by id (descending for most recent first)
         query = query.order("id", desc=True)
@@ -309,14 +332,6 @@ def get_blackswan_events(limit: Optional[int] = None) -> List[Event]:
         
         result = query.execute()
         events = [_db_dict_to_event(row) for row in result.data]
-        
-        # If no BLACKSWAN events found by type, try filtering by HIGH severity
-        if not events:
-            query2 = supabase.table("events").select("*").eq("severity", "HIGH").order("id", desc=True)
-            if limit:
-                query2 = query2.limit(limit)
-            result2 = query2.execute()
-            events = [_db_dict_to_event(row) for row in result2.data]
         
         return events
     except Exception as e:
@@ -329,11 +344,10 @@ def get_news_events(limit: Optional[int] = None) -> List[Event]:
     supabase = get_supabase_client()
     
     try:
-        # Try different column name variations
         query = supabase.table("events").select("*")
         
-        # Filter for MACRO and MICRO events (using "etype" based on your table structure)
-        query = query.in_("etype", ["MACRO", "MICRO"])
+        # Filter for MACRO and MICRO events
+        query = query.in_("type", ["MACRO", "MICRO"])
         
         # Order by id (descending for most recent first)
         query = query.order("id", desc=True)
@@ -347,3 +361,61 @@ def get_news_events(limit: Optional[int] = None) -> List[Event]:
     except Exception as e:
         print(f"Error fetching news events from Supabase: {e}")
         return []
+
+
+def update_event(event_id: str, updates: dict) -> Optional[Event]:
+    """
+    Update an event row in Supabase by database id or runtime_id.
+    'updates' should use API model field names; this function maps to DB columns.
+    """
+    supabase = get_supabase_client()
+    try:
+        # Map API fields to DB columns
+        field_map = {
+            "title": "headline",
+            "details": "description",
+            "impactPct": "impact_pct",
+            "baseImpactPct": "impulse_pct",
+            "icon": "icon",
+            "tags": "tags",
+            "type": "etype",
+        }
+        db_updates = {}
+        for k, v in updates.items():
+            if v is None:
+                continue
+            if k in field_map:
+                db_updates[field_map[k]] = v
+        if not db_updates:
+            return get_event_by_id(event_id)
+
+        # Update by numeric id or by runtime_id
+        if event_id.isdigit():
+            result = supabase.table("events").update(db_updates).eq("id", int(event_id)).execute()
+        else:
+            result = supabase.table("events").update(db_updates).eq("runtime_id", event_id).execute()
+
+        if not result.data:
+            return None
+        return _db_dict_to_event(result.data[0])
+    except Exception as e:
+        print(f"Error updating event in Supabase: {e}")
+        return None
+
+
+def delete_event(event_id: str) -> bool:
+    """
+    Delete an event row in Supabase by database id or runtime_id.
+    Returns True if a row was deleted.
+    """
+    supabase = get_supabase_client()
+    try:
+        if event_id.isdigit():
+            result = supabase.table("events").delete().eq("id", int(event_id)).execute()
+        else:
+            result = supabase.table("events").delete().eq("runtime_id", event_id).execute()
+        # Supabase python client returns deleted rows in data
+        return bool(result.data)
+    except Exception as e:
+        print(f"Error deleting event from Supabase: {e}")
+        return False

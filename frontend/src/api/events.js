@@ -169,3 +169,49 @@ export async function fetchNewsEvents(limit) {
   }
 }
 
+/**
+ * Update an event by database id or runtime_id.
+ * Only fields provided in 'updates' will be applied.
+ */
+export async function updateEvent(eventId, updates) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/events/${encodeURIComponent(eventId)}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(updates || {}),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to update event: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return { success: true, event: data.event };
+  } catch (error) {
+    console.error("Error updating event:", error);
+    return { success: false, error: error.message, event: null };
+  }
+}
+
+/**
+ * Delete an event by database id or runtime_id.
+ */
+export async function deleteEvent(eventId) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/events/${encodeURIComponent(eventId)}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to delete event: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return { success: true, message: data.message };
+  } catch (error) {
+    console.error("Error deleting event:", error);
+    return { success: false, error: error.message };
+  }
+}
+

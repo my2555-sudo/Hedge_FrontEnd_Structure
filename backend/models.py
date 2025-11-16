@@ -52,3 +52,17 @@ class EventsListResponse(BaseModel):
     events: List[Event]
     count: int
 
+
+class EventUpdate(BaseModel):
+    """
+    Partial update model for events stored in Supabase.
+    All fields are optional; only provided fields will be updated.
+    """
+    title: Optional[str] = None
+    details: Optional[str] = None
+    impactPct: Optional[float] = None
+    baseImpactPct: Optional[float] = None
+    icon: Optional[str] = None
+    tags: Optional[List[str]] = None
+    type: Optional[EventType] = None
+

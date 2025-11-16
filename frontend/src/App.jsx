@@ -274,6 +274,33 @@ function AppInner() {
             </button>
           </div>
         )}
+        {!profile && user && (
+          <div style={{ 
+            marginTop: 12, 
+            padding: 8, 
+            background: 'rgba(255,255,255,0.05)', 
+            borderRadius: 6,
+            fontSize: 12
+          }}>
+            <button
+              onClick={async () => {
+                await signOut();
+              }}
+              style={{
+                padding: '6px 10px',
+                fontSize: 12,
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: 4,
+                color: 'white',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
 
         <TimerDisplay seconds={secondsLeft} active={roundActive} />
         {/* Drive GameController’s active state from here so BlackSwan hook runs */}
