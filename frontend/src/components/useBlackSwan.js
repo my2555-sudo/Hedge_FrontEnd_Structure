@@ -2,25 +2,34 @@ import { useEffect, useRef } from "react";
 import { generateEvent } from "../api/events";
 import { nextBlackSwan } from "../data/mockEvents"; // Fallback if API fails
 
-function sampleDelayMs(meanSec, minSec = 45, maxSec = 180) {
+function sampleDelayMs(meanSec, minSec = 5, maxSec = 30) {
+  // For testing: much shorter delays (5-30 seconds instead of 45-180)
   const u = Math.random();
   const exp = -Math.log(1 - u) * meanSec;
   return Math.max(minSec, Math.min(exp, maxSec)) * 1000;
 }
 
-export function useBlackSwan({ active, onEvent, meanIntervalSec = 45, useBackendAPI = true } = {}) {
+export function useBlackSwan({ active, onEvent, meanIntervalSec = 15, useBackendAPI = true } = {}) {
   const timerRef = useRef(null);
-  const runningRef = useRef(false);
+  const firstEventFired = useRef(false);
+  const activeRef = useRef(active);
+
+  // Keep activeRef in sync
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   useEffect(() => {
-    if (!active) {
-      if (timerRef.current) clearTimeout(timerRef.current);
+    // Clear any existing timer when effect runs
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
       timerRef.current = null;
-      runningRef.current = false;
+    }
+
+    if (!active) {
+      firstEventFired.current = false;
       return;
     }
-    if (runningRef.current) return;
-    runningRef.current = true;
 
     async function fetchBlackSwanFromAPI() {
       if (useBackendAPI) {
@@ -38,22 +47,45 @@ export function useBlackSwan({ active, onEvent, meanIntervalSec = 45, useBackend
     }
 
     const schedule = () => {
-      const delay = sampleDelayMs(meanIntervalSec);
+      // For testing: fire first black swan quickly (5-10 seconds)
+      let delay;
+      if (!firstEventFired.current) {
+        delay = (5 + Math.random() * 5) * 1000; // 5-10 seconds for first event
+        firstEventFired.current = true;
+      } else {
+        delay = sampleDelayMs(meanIntervalSec);
+      }
+      
       timerRef.current = setTimeout(async () => {
+        // Check active state at execution time using ref
+        if (!activeRef.current) {
+          return;
+        }
+        
         try {
           const event = await fetchBlackSwanFromAPI();
-          onEvent?.(event);
+          if (event && onEvent) {
+            onEvent(event);
+          }
         } catch (e) {
-          console.error(e);
+          console.error("Error in black swan schedule:", e);
         }
-        schedule();
+        
+        // Schedule next event only if still active
+        if (activeRef.current) {
+          schedule();
+        }
       }, delay);
     };
+    
     schedule();
 
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      runningRef.current = false;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      firstEventFired.current = false;
     };
   }, [active, onEvent, meanIntervalSec, useBackendAPI]);
 }

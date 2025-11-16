@@ -66,6 +66,9 @@ export default function GameController({
   // Black Swan UI/state
   const [blackSwan, setBlackSwan] = useState(null);
   const [bsOccurredThisRound, setBsOccurredThisRound] = useState(false);
+  
+  // Force black swan in round 2 for testing
+  const blackSwanForcedRef = useRef(false);
 
   // parent-controlled active flag (if provided)
   const isActive = controlledActive ?? active;
@@ -138,14 +141,39 @@ export default function GameController({
     };
   }, [isActive, paused, roundOver, emitEvents]);
 
+  // Force black swan in round 2 for testing
+  useEffect(() => {
+    if (roundNumber === 2 && isActive && !paused && !blackSwanForcedRef.current) {
+      blackSwanForcedRef.current = true;
+      const timer = setTimeout(() => {
+        generateEvent({ forceBlackSwan: true })
+          .then((result) => {
+            if (result.success && result.event) {
+              setBsOccurredThisRound(true);
+              setBlackSwan(result.event);
+              handleEvent(result.event);
+            }
+          })
+          .catch((error) => {
+            console.error("Error generating forced black swan:", error);
+          });
+      }, 2000); // Wait 2 seconds after round 2 starts
+      
+      return () => clearTimeout(timer);
+    }
+  }, [roundNumber, isActive, paused]);
+
   // --- Black Swan emitter (rare, Poisson-timed) ---
+  // For testing: much faster frequency (15 seconds average, 5-30 second range)
+  const blackSwanActive = isActive && (emitEvents !== false);
+  
   useBlackSwan({
-    active: isActive && emitEvents,
-    meanIntervalSec: 120, // avg every ~2 minutes (bounded in hook)
+    active: blackSwanActive,
+    meanIntervalSec: 15, // avg every ~15 seconds for testing (was 120)
     useBackendAPI: true,  // Use backend API for blackswan events
     onEvent: (ev) => {
       setBsOccurredThisRound(true);
-      setBlackSwan(ev);       // open modal
+      setBlackSwan(ev);       // open modal popup
       handleEvent(ev);
     },
   });
@@ -165,15 +193,20 @@ export default function GameController({
         title: calculateTitle(newPortfolio),
       };
 
-      // publish to global feed (center panel)
-      addEvent({ ...event, ts: Date.now() });
+      // Only publish non-blackswan events to the news feed
+      // Black swan events appear as modal popup only
+      if (event.type !== "BLACKSWAN") {
+        addEvent({ ...event, ts: Date.now() });
+      }
 
-      // toast
-      setEventMessage({
-        text: `${event.title} (${impactAbs >= 0 ? "+" : ""}${impactAbs})`,
-        type: event.type,
-      });
-      setTimeout(() => setEventMessage(null), 3000);
+      // Only show toast for non-blackswan events (black swan has modal)
+      if (event.type !== "BLACKSWAN") {
+        setEventMessage({
+          text: `${event.title} (${impactAbs >= 0 ? "+" : ""}${impactAbs})`,
+          type: event.type,
+        });
+        setTimeout(() => setEventMessage(null), 3000);
+      }
 
       return updated;
     });
@@ -215,6 +248,7 @@ export default function GameController({
     setLeaderboard([]);
     setBsOccurredThisRound(false);
     setBlackSwan(null);
+    blackSwanForcedRef.current = false; // Reset forced flag
 
     // kick off with one immediate event so feed isn't empty
     generateEvent({ type: "MACRO" })
@@ -247,8 +281,31 @@ export default function GameController({
       if (roundOver) {
         setRoundOver(false);
         setSeconds(ROUND_DURATION);
-        setRoundNumber((prev) => prev + 1);
+        const newRound = roundNumber + 1;
+        setRoundNumber(newRound);
         setBsOccurredThisRound(false); // new round
+        
+        // Force black swan in round 2 for testing
+        if (newRound === 2 && !blackSwanForcedRef.current) {
+          blackSwanForcedRef.current = true;
+          console.log("[GameController] Forcing black swan in round 2...");
+          setTimeout(() => {
+            generateEvent({ forceBlackSwan: true })
+              .then((result) => {
+                if (result.success && result.event) {
+                  console.log("[GameController] Forced black swan event:", result.event);
+                  setBsOccurredThisRound(true);
+                  setBlackSwan(result.event);
+                  handleEvent(result.event);
+                } else {
+                  console.error("[GameController] Failed to generate forced black swan");
+                }
+              })
+              .catch((error) => {
+                console.error("[GameController] Error generating forced black swan:", error);
+              });
+          }, 2000); // Wait 2 seconds after round starts
+        }
       }
     }
   };
@@ -349,10 +406,15 @@ export default function GameController({
     zIndex: 1200,
   });
 
+
   return (
     <div style={containerStyle}>
-      {/* Black Swan decision modal */}
-      <BlackSwanModal event={blackSwan} open={!!blackSwan} onChoose={resolveBlackSwan} />
+      {/* Black Swan decision modal - appears as popup overlay */}
+      <BlackSwanModal 
+        event={blackSwan} 
+        open={!!blackSwan} 
+        onChoose={resolveBlackSwan}
+      />
 
       <div style={{ marginBottom: "16px" }}>
         <strong>Game Time:</strong> {formatTime(gameSeconds)}

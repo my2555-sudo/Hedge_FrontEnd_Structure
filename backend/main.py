@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from backend.routers import events, tickers, games, round_scores, price_snapshots
@@ -10,14 +11,23 @@ app = FastAPI(
 )
 
 # Configure CORS to allow frontend requests
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Allow origins from environment variable or use defaults for development
+cors_origins_env = os.getenv("CORS_ORIGINS")
+if cors_origins_env:
+    # Parse comma-separated origins from environment variable
+    allow_origins = [origin.strip() for origin in cors_origins_env.split(",")]
+else:
+    # Default development origins
+    allow_origins = [
         "http://localhost:5173",  # Vite default dev server
         "http://localhost:3000",  # Alternative React dev server
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

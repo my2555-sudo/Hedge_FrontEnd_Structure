@@ -4,32 +4,118 @@ from typing import List, Optional
 from backend.models import Event, EventType
 from backend.database import get_supabase_client
 
-# Event pools matching the frontend structure
+# Event pools - expanded with many more events
 MACRO_POOL = [
     {"id": "macro-1", "type": "MACRO", "title": "Fed hikes rates by 25 bps", "baseImpactPct": -0.012, "icon": "🏦", "tags": ["rates", "fed"]},
     {"id": "macro-2", "type": "MACRO", "title": "CPI cools below expectations", "baseImpactPct": 0.015, "icon": "🧾", "tags": ["inflation", "cpi"]},
     {"id": "macro-3", "type": "MACRO", "title": "Oil jumps on OPEC+ cuts", "baseImpactPct": 0.009, "icon": "🛢️", "tags": ["energy", "opec"]},
+    {"id": "macro-4", "type": "MACRO", "title": "Unemployment rate drops to 3.5%", "baseImpactPct": 0.011, "icon": "📊", "tags": ["employment", "labor"]},
+    {"id": "macro-5", "type": "MACRO", "title": "GDP growth exceeds forecasts", "baseImpactPct": 0.013, "icon": "📈", "tags": ["gdp", "growth"]},
+    {"id": "macro-6", "type": "MACRO", "title": "Trade deficit widens unexpectedly", "baseImpactPct": -0.010, "icon": "🌍", "tags": ["trade", "deficit"]},
+    {"id": "macro-7", "type": "MACRO", "title": "Housing starts surge 15%", "baseImpactPct": 0.008, "icon": "🏠", "tags": ["housing", "construction"]},
+    {"id": "macro-8", "type": "MACRO", "title": "Retail sales decline for third month", "baseImpactPct": -0.009, "icon": "🛒", "tags": ["retail", "consumption"]},
+    {"id": "macro-9", "type": "MACRO", "title": "Manufacturing PMI hits 18-month high", "baseImpactPct": 0.012, "icon": "🏭", "tags": ["manufacturing", "pmi"]},
+    {"id": "macro-10", "type": "MACRO", "title": "Dollar strengthens against major currencies", "baseImpactPct": -0.007, "icon": "💵", "tags": ["currency", "dollar"]},
+    {"id": "macro-11", "type": "MACRO", "title": "Consumer confidence index plummets", "baseImpactPct": -0.011, "icon": "😟", "tags": ["confidence", "consumer"]},
+    {"id": "macro-12", "type": "MACRO", "title": "Central bank signals dovish pivot", "baseImpactPct": 0.014, "icon": "🕊️", "tags": ["monetary", "policy"]},
+    {"id": "macro-13", "type": "MACRO", "title": "Bond yields spike on inflation fears", "baseImpactPct": -0.013, "icon": "📉", "tags": ["bonds", "yields"]},
+    {"id": "macro-14", "type": "MACRO", "title": "Jobless claims hit record low", "baseImpactPct": 0.010, "icon": "✅", "tags": ["employment", "claims"]},
+    {"id": "macro-15", "type": "MACRO", "title": "Industrial production falls 2.3%", "baseImpactPct": -0.012, "icon": "⚙️", "tags": ["industrial", "production"]},
 ]
 
 MICRO_POOL = [
     {"id": "micro-1", "type": "MICRO", "title": "TechCo beats; raises guidance", "baseImpactPct": 0.035, "icon": "💻", "tags": ["earnings", "tech"]},
     {"id": "micro-2", "type": "MICRO", "title": "BioHealth drug fails Phase 3", "baseImpactPct": -0.028, "icon": "🧪", "tags": ["trial", "biotech"]},
     {"id": "micro-3", "type": "MICRO", "title": "AutoCo announces $5B buyback", "baseImpactPct": 0.02, "icon": "🚗", "tags": ["buyback", "auto"]},
+    {"id": "micro-4", "type": "MICRO", "title": "RetailGiant misses revenue targets", "baseImpactPct": -0.022, "icon": "🏪", "tags": ["earnings", "retail"]},
+    {"id": "micro-5", "type": "MICRO", "title": "EnergyCorp discovers major oil field", "baseImpactPct": 0.025, "icon": "⛽", "tags": ["discovery", "energy"]},
+    {"id": "micro-6", "type": "MICRO", "title": "BankInc reports record profits", "baseImpactPct": 0.018, "icon": "🏛️", "tags": ["earnings", "banking"]},
+    {"id": "micro-7", "type": "MICRO", "title": "PharmaCo gets FDA approval", "baseImpactPct": 0.030, "icon": "💊", "tags": ["approval", "pharma"]},
+    {"id": "micro-8", "type": "MICRO", "title": "Airlines face pilot shortage crisis", "baseImpactPct": -0.015, "icon": "✈️", "tags": ["labor", "airlines"]},
+    {"id": "micro-9", "type": "MICRO", "title": "StreamCo adds 10M subscribers", "baseImpactPct": 0.022, "icon": "📺", "tags": ["growth", "media"]},
+    {"id": "micro-10", "type": "MICRO", "title": "ChipMaker announces factory expansion", "baseImpactPct": 0.019, "icon": "🔌", "tags": ["expansion", "semiconductors"]},
+    {"id": "micro-11", "type": "MICRO", "title": "FoodChain faces supply chain disruption", "baseImpactPct": -0.016, "icon": "🍔", "tags": ["supply", "retail"]},
+    {"id": "micro-12", "type": "MICRO", "title": "CloudCo signs $2B enterprise deal", "baseImpactPct": 0.027, "icon": "☁️", "tags": ["contract", "tech"]},
+    {"id": "micro-13", "type": "MICRO", "title": "AutoMaker recalls 500K vehicles", "baseImpactPct": -0.024, "icon": "🚙", "tags": ["recall", "auto"]},
+    {"id": "micro-14", "type": "MICRO", "title": "SocialMedia launches new ad platform", "baseImpactPct": 0.021, "icon": "📱", "tags": ["product", "tech"]},
+    {"id": "micro-15", "type": "MICRO", "title": "ShippingCo reports record losses", "baseImpactPct": -0.020, "icon": "🚢", "tags": ["earnings", "logistics"]},
+    {"id": "micro-16", "type": "MICRO", "title": "GamingCo releases blockbuster title", "baseImpactPct": 0.023, "icon": "🎮", "tags": ["product", "gaming"]},
+    {"id": "micro-17", "type": "MICRO", "title": "MiningCorp faces environmental lawsuit", "baseImpactPct": -0.017, "icon": "⛏️", "tags": ["legal", "mining"]},
+    {"id": "micro-18", "type": "MICRO", "title": "EVMaker doubles production capacity", "baseImpactPct": 0.026, "icon": "🔋", "tags": ["expansion", "ev"]},
 ]
 
 BLACKSWAN_POOL = [
     {"id": "bs-1", "type": "BLACKSWAN", "title": "Flash Crash: Liquidity Vacuum", "baseImpactPct": -0.12, "icon": "⚠️", "details": "Severe market dislocation detected. Liquidity has evaporated across major exchanges."},
     {"id": "bs-2", "type": "BLACKSWAN", "title": "Geopolitical Shock: Sanctions Escalation", "baseImpactPct": -0.08, "icon": "🛑", "details": "Major geopolitical event triggers widespread market uncertainty."},
     {"id": "bs-3", "type": "BLACKSWAN", "title": "Exchange Outage: Price Discovery Stalls", "baseImpactPct": -0.06, "icon": "🧯", "details": "Critical exchange infrastructure failure disrupts trading operations."},
+    {"id": "bs-4", "type": "BLACKSWAN", "title": "Cyber Attack: Major Bank Breach", "baseImpactPct": -0.10, "icon": "💻", "details": "Sophisticated cyber attack compromises major financial institution's systems."},
+    {"id": "bs-5", "type": "BLACKSWAN", "title": "Natural Disaster: Supply Chain Collapse", "baseImpactPct": -0.09, "icon": "🌊", "details": "Catastrophic natural disaster disrupts global supply chains."},
+    {"id": "bs-6", "type": "BLACKSWAN", "title": "Regulatory Bombshell: Industry Shakeup", "baseImpactPct": -0.11, "icon": "📜", "details": "Unexpected regulatory changes threaten entire industry sectors."},
+    {"id": "bs-7", "type": "BLACKSWAN", "title": "Currency Crisis: Emerging Market Crash", "baseImpactPct": -0.07, "icon": "💸", "details": "Major emerging market currency collapses, triggering global contagion."},
+    {"id": "bs-8", "type": "BLACKSWAN", "title": "Commodity Shock: Resource Shortage", "baseImpactPct": -0.085, "icon": "⚡", "details": "Critical resource shortage creates widespread economic disruption."},
 ]
 
 _seq_counter = 0
 _bs_seq_counter = 0
 
+# Track recently used events to avoid repetition
+_recently_used_events = []  # List of event IDs used in the last N events
+_MAX_RECENT_TRACK = 10  # Track last 10 events to avoid repetition
 
-def _pick_random(arr: List[dict]) -> dict:
-    """Pick a random item from a list."""
-    return random.choice(arr)
+
+def _get_recently_used_event_ids(limit: int = 20) -> set:
+    """
+    Get recently used event IDs from the database to avoid repetition.
+    Returns a set of event template IDs (like 'macro-1', 'micro-2') that were recently used.
+    """
+    supabase = get_supabase_client()
+    try:
+        # Get recent events from database (last 20 events)
+        result = supabase.table("events").select("headline").order("id", desc=True).limit(limit).execute()
+        
+        # Extract event IDs by matching headlines to our pools
+        recent_ids = set()
+        for row in result.data:
+            headline = row.get("headline", "")
+            # Match headline to find the event ID from our pools
+            for event in MACRO_POOL + MICRO_POOL + BLACKSWAN_POOL:
+                if event["title"] == headline:
+                    recent_ids.add(event["id"])
+                    break
+        return recent_ids
+    except Exception as e:
+        print(f"Error fetching recent events: {e}")
+        return set()
+
+
+def _pick_random(arr: List[dict], avoid_recent: bool = True) -> dict:
+    """
+    Pick a random item from a list, avoiding recently used events.
+    
+    Args:
+        arr: List of event dictionaries
+        avoid_recent: If True, avoid events that were recently used
+    
+    Returns:
+        Random event dictionary
+    """
+    if not arr:
+        raise ValueError("Cannot pick from empty array")
+    
+    if not avoid_recent or len(arr) <= 1:
+        return random.choice(arr)
+    
+    # Get recently used event IDs
+    recent_ids = _get_recently_used_event_ids()
+    
+    # Filter out recently used events
+    available = [e for e in arr if e["id"] not in recent_ids]
+    
+    # If all events were recently used, use the full pool anyway (to avoid infinite loop)
+    if not available:
+        available = arr
+    
+    return random.choice(available)
 
 def _get_or_create_round_id() -> int:
     """
@@ -64,20 +150,22 @@ def _map_event_type_for_enum(event_type: str) -> str:
 def _event_to_db_dict(event: Event, round_id: Optional[int] = None, target_ticker_id: Optional[int] = None) -> dict:
     """
     Convert Event model to database dictionary format.
-    Maps to schema defined in database/schema.sql:
-    - event_id (text)
-    - type (text)
-    - title (text)
-    - base_impact_pct (numeric)
-    - impact_pct (numeric)
-    - icon (text)
-    - tags (text[])
-    - runtime_id (text)
-    - ts (bigint)
-    - details (text)
+    Maps to the ACTUAL Supabase schema:
+    - id (auto-generated)
+    - round_id (int8)
+    - etype (event_type enum: MACRO, MICRO)
+    - severity (event_severity enum)
+    - headline (text)
+    - description (text)
+    - target_ticker_id (int8, nullable)
+    - impulse_pct (numeric) - base impact percentage
+    - impact_pct (numeric) - actual impact with jitter
+    - created_at (auto-generated)
     """
+    # Map event type to etype (BLACKSWAN -> MICRO for enum compatibility)
     mapped_type = _map_event_type_for_enum(event.type)
-    # derive severity for legacy schemas
+    
+    # Calculate severity based on impact
     impact_abs = abs(float(event.impactPct))
     if event.type == "BLACKSWAN":
         severity = "HIGH"
@@ -87,44 +175,47 @@ def _event_to_db_dict(event: Event, round_id: Optional[int] = None, target_ticke
         severity = "NORMAL"
     else:
         severity = "LOW"
+    
+    # Build dictionary matching actual schema
     db_dict = {
-        "event_id": event.id,
-        "type": event.type,
-        "etype": mapped_type,  # compatibility for older schema (enum limited to MACRO/MICRO)
+        "etype": mapped_type,
         "severity": severity,
-        "title": event.title,
-        "headline": event.title,  # compatibility for older schema
-        "base_impact_pct": float(event.baseImpactPct),
-        "impulse_pct": float(event.baseImpactPct),  # compatibility for older schema
+        "headline": event.title,
+        "description": event.details or f"{event.title} - Market impact: {event.impactPct * 100:.2f}%",
+        "impulse_pct": float(event.baseImpactPct),
         "impact_pct": float(event.impactPct),
-        "icon": event.icon,
-        "tags": event.tags or [],
-        "runtime_id": event.runtimeId,
-        "ts": int(event.ts),
-        "details": event.details or f"{event.title} - Market impact: {event.impactPct * 100:.2f}%",
-        "description": event.details or f"{event.title} - Market impact: {event.impactPct * 100:.2f}%",  # compatibility
     }
+    
+    # Add optional fields if provided
     if round_id is not None:
         db_dict["round_id"] = round_id
     if target_ticker_id is not None:
         db_dict["target_ticker_id"] = target_ticker_id
+    
     return db_dict
 
 
 def _db_dict_to_event(db_dict: dict) -> Event:
     """
     Convert database dictionary to Event model.
-    Maps from existing Supabase table structure to Event model.
+    Maps from ACTUAL Supabase table structure to Event model.
     """
-    # Extract event type (prefer 'type' per schema)
-    event_type = db_dict.get("type") or db_dict.get("etype") or db_dict.get("event_type") or db_dict.get("type", "MACRO")
-    # Extract title
-    title = db_dict.get("title") or db_dict.get("headline", "")
+    # Extract event type from etype (actual column name)
+    event_type = db_dict.get("etype") or db_dict.get("type", "MACRO")
+    # If stored as MICRO but severity is HIGH, it might be a BLACKSWAN
+    if event_type == "MICRO" and db_dict.get("severity") == "HIGH" and abs(float(db_dict.get("impact_pct", 0))) > 0.05:
+        event_type = "BLACKSWAN"
+    
+    # Extract title from headline (actual column name)
+    title = db_dict.get("headline") or db_dict.get("title", "")
     # Extract description/details
-    details = db_dict.get("details") or db_dict.get("description")
-    # Runtime id
-    runtime_id = db_dict.get("runtime_id") or f"event-{db_dict.get('id', 'unknown')}-{int(time.time() * 1000)}"
-    # Timestamp
+    details = db_dict.get("description") or db_dict.get("details")
+    
+    # Generate runtime id from database id and timestamp
+    db_id = db_dict.get("id", "unknown")
+    runtime_id = f"event-{db_id}-{int(time.time() * 1000)}"
+    
+    # Timestamp from created_at
     ts = db_dict.get("ts")
     if not ts and db_dict.get("created_at"):
         # Convert created_at timestamp to milliseconds
@@ -137,13 +228,11 @@ def _db_dict_to_event(db_dict: dict) -> Event:
     if not ts:
         ts = int(time.time() * 1000)
     
-    # Get impact_pct from database (preferred) or estimate
-    impact_pct = db_dict.get("impact_pct")
-    if impact_pct is None:
-        impact_pct = db_dict.get("base_impact_pct") or 0
+    # Get impact_pct from database
+    impact_pct = db_dict.get("impact_pct", 0)
     
-    # Get base_impact_pct
-    base_impact_pct = db_dict.get("base_impact_pct") or db_dict.get("impulse_pct")
+    # Get base_impact_pct from impulse_pct (actual column name)
+    base_impact_pct = db_dict.get("impulse_pct") or db_dict.get("base_impact_pct")
     if base_impact_pct is None:
         base_impact_pct = impact_pct  # Use impact_pct as fallback
     
@@ -156,8 +245,8 @@ def _db_dict_to_event(db_dict: dict) -> Event:
         title=title,
         baseImpactPct=float(base_impact_pct),
         impactPct=float(impact_pct),
-        icon=db_dict.get("icon", "📰"),  # Default icon if not stored
-        tags=db_dict.get("tags", []) or [],
+        icon="📰",  # Default icon (not stored in actual schema)
+        tags=[],  # Tags not stored in actual schema
         runtimeId=runtime_id,
         ts=ts,
         details=details,
@@ -180,8 +269,8 @@ def generate_event(event_type: Optional[EventType] = None, force_blackswan: bool
     supabase = get_supabase_client()
     
     if force_blackswan or event_type == "BLACKSWAN":
-        # Generate blackswan event
-        base = _pick_random(BLACKSWAN_POOL)
+        # Generate blackswan event (avoid recent ones)
+        base = _pick_random(BLACKSWAN_POOL, avoid_recent=True)
         jitter = (random.random() - 0.5) * 0.04
         impact_pct = round(base["baseImpactPct"] + jitter, 4)
         runtime_id = f"{base['id']}-{int(time.time() * 1000)}-{_bs_seq_counter}"
@@ -209,7 +298,8 @@ def generate_event(event_type: Optional[EventType] = None, force_blackswan: bool
             # Randomly choose between MACRO and MICRO (50/50)
             pool = random.choice([MACRO_POOL, MICRO_POOL])
         
-        base = _pick_random(pool)
+        # Pick random event avoiding recently used ones
+        base = _pick_random(pool, avoid_recent=True)
         jitter = (random.random() - 0.5) * 0.008  # ±0.4%
         impact_pct = round(base["baseImpactPct"] + jitter, 4)
         runtime_id = f"{base['id']}-{int(time.time() * 1000)}-{_seq_counter}"
@@ -229,14 +319,19 @@ def generate_event(event_type: Optional[EventType] = None, force_blackswan: bool
     
     # Store the event in Supabase
     try:
-        # Use latest round id (with safe fallback) to satisfy FK/NOT NULL
+        # Use latest round id (with safe fallback) to satisfy FK/NOT NULL if round_id is required
         resolved_round_id = _get_or_create_round_id()
         db_dict = _event_to_db_dict(event, round_id=resolved_round_id, target_ticker_id=None)
         result = supabase.table("events").insert(db_dict).execute()
         if not result.data:
             print(f"Warning: Event inserted but no data returned: {runtime_id}")
+        else:
+            print(f"Successfully stored event: {runtime_id} (id: {result.data[0].get('id', 'unknown')})")
     except Exception as e:
         print(f"Error storing event in Supabase: {e}")
+        print(f"Event data that failed to insert: {db_dict}")
+        import traceback
+        traceback.print_exc()
         # Continue anyway - event is still generated, just not stored
         # In production, you might want to raise this or handle it differently
     
@@ -262,9 +357,14 @@ def get_all_events(limit: Optional[int] = None, event_type: Optional[EventType] 
         # Order by id (descending for most recent first)
         query = query.order("id", desc=True)
         
-        # Filter by type if specified
+        # Filter by type if specified (use etype column)
         if event_type:
-            query = query.eq("type", event_type)
+            # Map BLACKSWAN to MICRO for query (since BLACKSWAN is stored as MICRO in etype)
+            mapped_type = _map_event_type_for_enum(event_type)
+            query = query.eq("etype", mapped_type)
+            # If looking for BLACKSWAN, also filter by severity
+            if event_type == "BLACKSWAN":
+                query = query.eq("severity", "HIGH")
         
         # Apply limit
         if limit:
@@ -315,14 +415,14 @@ def get_event_by_id(event_id: str) -> Optional[Event]:
 
 def get_blackswan_events(limit: Optional[int] = None) -> List[Event]:
     """Get all blackswan events from Supabase."""
-    # BLACKSWAN events might be identified by severity="HIGH" or type="BLACKSWAN"
+    # BLACKSWAN events are stored as etype="MICRO" with severity="HIGH"
     supabase = get_supabase_client()
     
     try:
         query = supabase.table("events").select("*")
         
-        # Filter by BLACKSWAN type
-        query = query.eq("type", "BLACKSWAN")
+        # Filter by HIGH severity (BLACKSWAN events are stored as MICRO with HIGH severity)
+        query = query.eq("etype", "MICRO").eq("severity", "HIGH")
         
         # Order by id (descending for most recent first)
         query = query.order("id", desc=True)
@@ -346,8 +446,8 @@ def get_news_events(limit: Optional[int] = None) -> List[Event]:
     try:
         query = supabase.table("events").select("*")
         
-        # Filter for MACRO and MICRO events
-        query = query.in_("type", ["MACRO", "MICRO"])
+        # Filter for MACRO and MICRO events (use etype column)
+        query = query.in_("etype", ["MACRO", "MICRO"])
         
         # Order by id (descending for most recent first)
         query = query.order("id", desc=True)
