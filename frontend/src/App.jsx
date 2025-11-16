@@ -14,35 +14,32 @@ import StatsDashboard from "./components/StatsDashboard.jsx";
 import { initialPortfolio } from "./data/mockPortfolio.js";
 import { EventProvider, useEventBus } from "./components/EventContext.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";
+import { useGameContext } from "./contexts/GameContext.jsx";
+import { usePriceSnapshots } from "./hooks/usePriceSnapshots.js";
+import { getTickers } from "./api/tickers.js";
 import LoginPage from "./components/LoginPage.jsx";
+import { saveRoundScore as apiSaveRoundScore } from "./api/roundScores.js";
 
 function AppInner() {
   const { user, profile, loading, signOut } = useAuth();
-
-  // Show login page if not authenticated
-  if (loading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        height: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: 'white'
-      }}>
-        <div>Loading...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <LoginPage />;
-  }
+  const {
+    currentGameId,
+    currentRoundId,
+    currentParticipantId,
+    tickerIdMap,
+    setTickerIdMap,
+    initializeGame,
+    initializeRound,
+    endCurrentRound,
+  } = useGameContext();
+  const { captureSnapshots } = usePriceSnapshots();
 
   // --- game state (top-level UI timer only) ---
+  // All hooks must be called before any early returns (React Hooks rules)
   const ROUND_SECONDS = 30;
   const [secondsLeft, setSecondsLeft] = useState(ROUND_SECONDS);
   const [roundActive, setRoundActive] = useState(false);
+  const [roundNumber, setRoundNumber] = useState(1);
 
   // global event bus
   const { events } = useEventBus();
@@ -51,7 +48,7 @@ function AppInner() {
   const [lastEvent, setLastEvent] = useState(null);
   const [portfolio, setPortfolio] = useState(initialPortfolio); // [{ticker, price, shares, avgPrice, sector?}]
 
-  // Cash 机制
+  // Cash mechanism
   const STARTING_CASH = 10000;
   const [cash, setCash] = useState(STARTING_CASH);
 
@@ -82,29 +79,71 @@ function AppInner() {
   // ensure we only apply each event once to portfolio
   const lastAppliedIdRef = useRef(null);
 
-  // === 统一应用价格冲击（全市场 + 行业 + 个股）===
+  // Ref to store current round ID (persists even if state is cleared)
+  const currentRoundIdRef = useRef(null);
+  const currentParticipantIdRef = useRef(null);
+  const lastProcessedRoundRef = useRef(null); // avoid double-processing same round
+
+  // === Initialize Tickers (on app startup) ===
+  useEffect(() => {
+    getTickers().then((result) => {
+      if (result.success && result.tickers.length > 0) {
+        // Build symbol → id mapping
+        const map = Object.fromEntries(result.tickers.map((t) => [t.symbol, t.id]));
+        setTickerIdMap(map);
+
+        // Update portfolio, add tickerId
+        setPortfolio((prev) =>
+          prev.map((row) => {
+            const ticker = result.tickers.find((t) => t.symbol === row.ticker);
+            return ticker ? { ...row, tickerId: ticker.id } : row;
+          })
+        );
+      } else {
+        // Fallback: use mockPortfolio, but without tickerId
+        console.warn("Failed to load tickers, using mock data");
+      }
+    });
+  }, []); // Execute only once on app startup
+
+  // === Apply price impacts (market-wide + sector + ticker) ===
   function applyImpacts(ev) {
-    setPortfolio((prev) =>
-      prev.map((row) => {
-        // 基线：全市场
+    setPortfolio((prev) => {
+      const updated = prev.map((row) => {
+        // Base: market-wide
         let pct = ev?.impactPct ?? 0;
 
-        // 叠加：行业（事件可选字段）
+        // Add: sector (optional event field)
         if (ev?.impacts?.sector && row.sector) {
           pct += ev.impacts.sector[row.sector] ?? 0;
         }
 
-        // 叠加：个股（事件可选字段）
+        // Add: ticker (optional event field)
         if (ev?.impacts?.ticker) {
           pct += ev.impacts.ticker[row.ticker] ?? 0;
         }
 
         return { ...row, price: +(row.price * (1 + pct)).toFixed(2) };
-      })
-    );
+      });
+
+      // Auto-capture price snapshots (async, non-blocking)
+      // Use ref values to ensure they're available even if state was cleared
+      const gameIdForSnapshot = currentGameId;
+      const roundIdForSnapshot = currentRoundIdRef.current || currentRoundId;
+      if (gameIdForSnapshot && roundIdForSnapshot) {
+        // Use updated portfolio
+        setTimeout(() => {
+          captureSnapshots(updated, gameIdForSnapshot, roundIdForSnapshot).catch((err) => {
+            console.warn("Failed to capture price snapshots:", err);
+          });
+        }, 0);
+      }
+
+      return updated;
+    });
   }
 
-  // 顶层 UI 倒计时（独立于 GameController 内部计时）
+  // Top-level UI countdown (independent of GameController internal timer)
   useEffect(() => {
     if (!roundActive) return;
     if (secondsLeft <= 0) return;
@@ -112,13 +151,13 @@ function AppInner() {
     return () => clearTimeout(t);
   }, [roundActive, secondsLeft]);
 
-  // 有新事件到达时，仅应用一次价格冲击
+  // When new event arrives, apply price impact only once
   useEffect(() => {
     if (!roundActive) return;
     const ev = events[0];
     if (!ev) return;
 
-    // 防止重复应用同一事件
+    // Prevent duplicate application of same event
     if (lastAppliedIdRef.current === ev.runtimeId) return;
     lastAppliedIdRef.current = ev.runtimeId;
 
@@ -131,7 +170,7 @@ function AppInner() {
     lastEventIdRef.current = ev.runtimeId;
   }, [events, roundActive]);
 
-  // 交易（含现金校验）
+  // Trade (with cash validation)
   function handleTrade({ ticker, action, qty }) {
     const row = portfolio.find((r) => r.ticker === ticker);
     if (!row) return;
@@ -183,7 +222,7 @@ function AppInner() {
     setTimeout(() => setFlashTicker(null), 400);
   }
 
-  // 总 P/L
+  // Total P/L
   const totalPnL = useMemo(
     () =>
       portfolio.reduce(
@@ -208,7 +247,63 @@ function AppInner() {
     }
   }, [roundActive, totalPnL]);
 
-  // 回合控制
+  // === Game initialization (when game starts for first time) ===
+  useEffect(() => {
+    if (roundActive && roundNumber === 1 && !currentGameId) {
+      // Initialize game and participant
+      initializeGame(STARTING_CASH)
+        .then((result) => {
+          if (result.success) {
+            // Store participant ID in ref
+            currentParticipantIdRef.current = result.participantId;
+          } else {
+            console.error("Failed to initialize game:", result.error);
+          }
+        })
+        .catch((err) => {
+          console.error("Error initializing game:", err);
+        });
+    }
+  }, [roundActive, roundNumber, currentGameId, initializeGame]);
+
+  // Update participant ID ref when it changes
+  useEffect(() => {
+    if (currentParticipantId) {
+      currentParticipantIdRef.current = currentParticipantId;
+    }
+  }, [currentParticipantId]);
+
+  // === Round initialization (at start of each round) ===
+  useEffect(() => {
+    if (roundActive && currentGameId && roundNumber) {
+      // Initialize round
+      initializeRound(roundNumber)
+        .then((result) => {
+          if (result.success) {
+            // Store round ID in ref (persists even if state is cleared)
+            currentRoundIdRef.current = result.roundId;
+            // Capture price snapshot at round start (use ref values to ensure they're available)
+            captureSnapshots(portfolio, currentGameId, result.roundId).catch((err) => {
+              console.warn("Failed to capture initial price snapshots:", err);
+            });
+          } else {
+            console.error("Failed to initialize round:", result.error);
+          }
+        })
+        .catch((err) => {
+          console.error("Error initializing round:", err);
+        });
+    }
+  }, [roundActive, currentGameId, roundNumber, initializeRound, captureSnapshots, portfolio]);
+
+  // Update round ID ref when it changes
+  useEffect(() => {
+    if (currentRoundId) {
+      currentRoundIdRef.current = currentRoundId;
+    }
+  }, [currentRoundId]);
+
+  // Round control
   function startRound() {
     setLastEvent(null);
     setPctImpact(0);
@@ -216,20 +311,120 @@ function AppInner() {
     lastAppliedIdRef.current = null;
     setRoundActive(true);
     lastRoundPnLRef.current = totalPnL;
+    // Update roundNumber (if resuming from pause, don't increment)
+    // Note: roundNumber increments after each round ends, controlled by GameController or other logic
   }
   
-  // Track streak based on round survival (simple: if P/L improved or stayed positive)
-  useEffect(() => {
-    if (!roundActive && secondsLeft <= 0 && lastRoundPnLRef.current !== undefined) {
-      const survived = totalPnL >= lastRoundPnLRef.current || totalPnL >= 0;
-      setStreak((prev) => survived ? prev + 1 : 0);
+  // Handle round end (called from GameController)
+  async function handleRoundEnd({ roundNumber: endedRoundNumber }) {
+    // Avoid double-processing the same round (React StrictMode / multiple calls)
+    if (lastProcessedRoundRef.current === endedRoundNumber) {
+      return;
     }
-  }, [roundActive, secondsLeft, totalPnL]);
+    lastProcessedRoundRef.current = endedRoundNumber;
+
+    // Determine if player "survived" this round (basic rule)
+    const survived = totalPnL >= lastRoundPnLRef.current || totalPnL >= 0;
+    setStreak((prev) => (survived ? prev + 1 : 0));
+
+    const roundIdToSave = currentRoundIdRef.current || currentRoundId;
+    const participantIdToSave = currentParticipantIdRef.current || currentParticipantId;
+
+    if (!roundIdToSave || !participantIdToSave) {
+      console.warn("Cannot save round score: missing IDs", {
+        roundId: roundIdToSave,
+        participantId: participantIdToSave,
+      });
+      return;
+    }
+
+    // Calculate reaction window and whether the player reacted
+    const REACTION_WINDOW_MS = 10000;
+    let reacted = false;
+    let reactionMs = null;
+
+    if (lastEvent && lastEvent.ts && recentTrades && recentTrades.length > 0) {
+      const tradesAfterEvent = recentTrades.filter(
+        (trade) =>
+          trade.timestamp >= lastEvent.ts &&
+          trade.timestamp <= lastEvent.ts + REACTION_WINDOW_MS
+      );
+
+      if (tradesAfterEvent.length > 0) {
+        const firstTrade = tradesAfterEvent.reduce((earliest, trade) => {
+          return trade.timestamp < earliest.timestamp ? trade : earliest;
+        }, tradesAfterEvent[0]);
+        reactionMs = firstTrade.timestamp - lastEvent.ts;
+        reacted = true;
+      }
+    }
+
+    const pnlDelta = totalPnL - (lastRoundPnLRef.current || 0);
+
+    try {
+      const result = await apiSaveRoundScore({
+        participant_id: participantIdToSave,
+        round_id: roundIdToSave,
+        pnl_delta: pnlDelta,
+        reacted,
+        reaction_ms: reactionMs,
+      });
+
+      if (!result.success) {
+        console.error("Failed to save round score:", result.error);
+      }
+    } catch (error) {
+      console.error("Error saving round score:", error);
+    }
+
+    // Capture price snapshot at round end (use ref values)
+    const roundIdForSnapshot = currentRoundIdRef.current || currentRoundId;
+    if (currentGameId && roundIdForSnapshot) {
+      setPortfolio((currentPortfolio) => {
+        captureSnapshots(currentPortfolio, currentGameId, roundIdForSnapshot).catch(
+          (err) => {
+            console.warn("Failed to capture final price snapshots:", err);
+          }
+        );
+        return currentPortfolio;
+      });
+    }
+
+    // End round in backend and prepare for next round
+    try {
+      await endCurrentRound();
+    } catch (error) {
+      console.warn("Failed to end round:", error);
+    }
+
+    setRoundNumber((prev) => prev + 1);
+  }
+
   function pauseRound() {
     setRoundActive(false);
   }
   function resumeRound() {
     if (secondsLeft > 0) setRoundActive(true);
+  }
+
+  // Show login page if not authenticated (after all hooks)
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white'
+      }}>
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
   }
 
   return (
@@ -304,7 +499,7 @@ function AppInner() {
 
         <TimerDisplay seconds={secondsLeft} active={roundActive} />
         {/* Drive GameController’s active state from here so BlackSwan hook runs */}
-        <GameController controlledActive={roundActive} />
+        <GameController controlledActive={roundActive} onRoundEnd={handleRoundEnd} />
 
         <div style={{ marginTop: 12 }}>
           <button className="btn start" onClick={startRound}>

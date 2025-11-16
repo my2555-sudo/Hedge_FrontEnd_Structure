@@ -3,17 +3,17 @@ import { useState } from "react";
 export default function TradeControls({ tickers, positions = {}, onTrade, disabled }) {
   const [ticker, setTicker] = useState(tickers?.[0] || "");
   const [qty, setQty] = useState(1);
-  const [err, setErr] = useState(""); // 新增：存储错误提示文本
+  const [err, setErr] = useState(""); // Store error message text
 
-  // ✅ 新增：带校验的交易函数
+  // Trade function with validation
   function tryTrade(kind) {
     setErr("");
     if (!ticker) return setErr("Pick a ticker first");
     if (qty < 1) return setErr("Quantity must be at least 1");
 
-    // 卖出校验
+    // Sell validation
     if (kind === "SELL") {
-      const pos = positions[ticker] ?? 0; // 当前持仓
+      const pos = positions[ticker] ?? 0; // Current position
       if (qty > pos) return setErr(`You only hold ${pos} share(s) of ${ticker}`);
     }
 
@@ -52,7 +52,7 @@ export default function TradeControls({ tickers, positions = {}, onTrade, disabl
         Sell
       </button>
 
-      {/* 错误提示信息 */}
+      {/* Error message */}
       {err && (
         <div style={{ gridColumn: "1 / -1", color: "#fb7185", fontSize: 12 }}>
           {err}

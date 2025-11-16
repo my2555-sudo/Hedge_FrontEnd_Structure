@@ -23,7 +23,7 @@ body{
   width: 100%;
   min-height: 100vh;
   display: grid;
-  /* 左列-中列-右列：在不同屏宽下自适应 */
+  /* Left-Center-Right columns: responsive to different screen widths */
   grid-template-columns: clamp(230px, 18vw, 320px)
                          1fr
                          clamp(380px, 30vw, 540px);

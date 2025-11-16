@@ -16,7 +16,7 @@ export default function PortfolioTable({ rows, flashTicker }) {
           const pnl = (r.price - r.avgPrice) * r.shares;
           const pnlClass = pnl >= 0 ? "PnlGood" : "PnlBad";
 
-          // ✅ 新增：当 ticker === flashTicker 时，整行加高亮动画类
+          // Add highlight animation class when ticker === flashTicker
           const rowClass = r.ticker === flashTicker ? "flash-row" : "";
 
           return (

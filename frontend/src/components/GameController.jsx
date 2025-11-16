@@ -38,7 +38,8 @@ export default function GameController({
   gameDuration = 300,
   playerName = "Player1",
   emitEvents = true,
-  controlledActive,           // NEW: allow parent to control active state
+  controlledActive,           // allow parent to control active state
+  onRoundEnd,                 // optional callback when a round ends
 }) {
   const totalRounds = Math.floor(gameDuration / ROUND_DURATION);
   const { addEvent } = useEventBus();
@@ -280,6 +281,20 @@ export default function GameController({
       updated.sort((a, b) => b.portfolioValue - a.portfolioValue);
       return updated;
     });
+
+    // Notify parent that the round has ended (for persistence, etc.)
+    if (typeof onRoundEnd === "function") {
+      try {
+        onRoundEnd({
+          roundNumber,
+          totalRounds,
+          portfolioValue: gameState.portfolioValue,
+          blackSwanOccurred: bsOccurredThisRound,
+        });
+      } catch (error) {
+        console.error("Error in onRoundEnd callback:", error);
+      }
+    }
 
     if (roundNumber >= totalRounds) {
       stopGame();
