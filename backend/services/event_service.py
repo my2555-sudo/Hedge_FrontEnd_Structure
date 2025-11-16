@@ -322,14 +322,36 @@ def generate_event(event_type: Optional[EventType] = None, force_blackswan: bool
         # Use latest round id (with safe fallback) to satisfy FK/NOT NULL if round_id is required
         resolved_round_id = _get_or_create_round_id()
         db_dict = _event_to_db_dict(event, round_id=resolved_round_id, target_ticker_id=None)
+        
+        # Log what we're trying to insert for debugging
+        print(f"[DEBUG] Attempting to insert {event.type} event: headline='{event.title}', round_id={resolved_round_id}")
+        print(f"[DEBUG] Full db_dict: {db_dict}")
+        
         result = supabase.table("events").insert(db_dict).execute()
         if not result.data:
-            print(f"Warning: Event inserted but no data returned: {runtime_id}")
+            print(f"⚠️ Warning: {event.type} event inserted but no data returned: {runtime_id}")
+            print(f"   This might indicate a constraint violation or RLS policy issue")
         else:
-            print(f"Successfully stored event: {runtime_id} (id: {result.data[0].get('id', 'unknown')})")
+            event_type_label = "BLACKSWAN" if event.type == "BLACKSWAN" else event.type
+            print(f"✓ Successfully stored {event_type_label} event in Supabase: '{event.title}' (runtime_id: {runtime_id}, db_id: {result.data[0].get('id', 'unknown')}, round_id: {resolved_round_id})")
     except Exception as e:
-        print(f"Error storing event in Supabase: {e}")
-        print(f"Event data that failed to insert: {db_dict}")
+        error_msg = str(e)
+        print(f"✗ Error storing {event.type} event in Supabase: {error_msg}")
+        print(f"   Event headline: '{event.title}'")
+        print(f"   Round ID: {resolved_round_id}")
+        print(f"   Full db_dict: {db_dict}")
+        
+        # Check for common error patterns
+        if "duplicate" in error_msg.lower() or "unique" in error_msg.lower():
+            print(f"   ⚠️ This looks like a duplicate/unique constraint violation!")
+            print(f"   The event might already exist in the database.")
+        elif "null" in error_msg.lower() or "not null" in error_msg.lower():
+            print(f"   ⚠️ This looks like a NOT NULL constraint violation!")
+            print(f"   Check if round_id or other required fields are missing.")
+        elif "permission" in error_msg.lower() or "policy" in error_msg.lower() or "rls" in error_msg.lower():
+            print(f"   ⚠️ This looks like a Row Level Security (RLS) policy issue!")
+            print(f"   Check your Supabase RLS policies for the events table.")
+        
         import traceback
         traceback.print_exc()
         # Continue anyway - event is still generated, just not stored

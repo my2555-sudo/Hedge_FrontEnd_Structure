@@ -2,14 +2,14 @@ import { useEffect, useRef } from "react";
 import { generateEvent } from "../api/events";
 import { nextBlackSwan } from "../data/mockEvents"; // Fallback if API fails
 
-function sampleDelayMs(meanSec, minSec = 5, maxSec = 30) {
-  // For testing: much shorter delays (5-30 seconds instead of 45-180)
+function sampleDelayMs(meanSec, minSec = 45, maxSec = 180) {
+  // Normal delays: 45-180 seconds (was 5-30 for testing)
   const u = Math.random();
   const exp = -Math.log(1 - u) * meanSec;
   return Math.max(minSec, Math.min(exp, maxSec)) * 1000;
 }
 
-export function useBlackSwan({ active, onEvent, meanIntervalSec = 15, useBackendAPI = true } = {}) {
+export function useBlackSwan({ active, onEvent, meanIntervalSec = 120, useBackendAPI = true } = {}) {
   const timerRef = useRef(null);
   const firstEventFired = useRef(false);
   const activeRef = useRef(active);
@@ -47,13 +47,10 @@ export function useBlackSwan({ active, onEvent, meanIntervalSec = 15, useBackend
     }
 
     const schedule = () => {
-      // For testing: fire first black swan quickly (5-10 seconds)
-      let delay;
+      // Normal frequency: use the mean interval for all events
+      const delay = sampleDelayMs(meanIntervalSec);
       if (!firstEventFired.current) {
-        delay = (5 + Math.random() * 5) * 1000; // 5-10 seconds for first event
         firstEventFired.current = true;
-      } else {
-        delay = sampleDelayMs(meanIntervalSec);
       }
       
       timerRef.current = setTimeout(async () => {

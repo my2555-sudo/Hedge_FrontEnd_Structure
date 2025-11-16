@@ -66,9 +66,6 @@ export default function GameController({
   // Black Swan UI/state
   const [blackSwan, setBlackSwan] = useState(null);
   const [bsOccurredThisRound, setBsOccurredThisRound] = useState(false);
-  
-  // Force black swan in round 2 for testing
-  const blackSwanForcedRef = useRef(false);
 
   // parent-controlled active flag (if provided)
   const isActive = controlledActive ?? active;
@@ -141,35 +138,15 @@ export default function GameController({
     };
   }, [isActive, paused, roundOver, emitEvents]);
 
-  // Force black swan in round 2 for testing
-  useEffect(() => {
-    if (roundNumber === 2 && isActive && !paused && !blackSwanForcedRef.current) {
-      blackSwanForcedRef.current = true;
-      const timer = setTimeout(() => {
-        generateEvent({ forceBlackSwan: true })
-          .then((result) => {
-            if (result.success && result.event) {
-              setBsOccurredThisRound(true);
-              setBlackSwan(result.event);
-              handleEvent(result.event);
-            }
-          })
-          .catch((error) => {
-            console.error("Error generating forced black swan:", error);
-          });
-      }, 2000); // Wait 2 seconds after round 2 starts
-      
-      return () => clearTimeout(timer);
-    }
-  }, [roundNumber, isActive, paused]);
+  // Removed forced black swan in round 2 - now uses normal frequency
 
   // --- Black Swan emitter (rare, Poisson-timed) ---
-  // For testing: much faster frequency (15 seconds average, 5-30 second range)
-  const blackSwanActive = isActive && (emitEvents !== false);
+  // Only active when game is active AND not paused
+  const blackSwanActive = isActive && !paused && (emitEvents !== false);
   
   useBlackSwan({
     active: blackSwanActive,
-    meanIntervalSec: 15, // avg every ~15 seconds for testing (was 120)
+    meanIntervalSec: 120, // avg every ~2 minutes (normal frequency)
     useBackendAPI: true,  // Use backend API for blackswan events
     onEvent: (ev) => {
       setBsOccurredThisRound(true);
@@ -248,7 +225,6 @@ export default function GameController({
     setLeaderboard([]);
     setBsOccurredThisRound(false);
     setBlackSwan(null);
-    blackSwanForcedRef.current = false; // Reset forced flag
 
     // kick off with one immediate event so feed isn't empty
     generateEvent({ type: "MACRO" })
@@ -281,31 +257,8 @@ export default function GameController({
       if (roundOver) {
         setRoundOver(false);
         setSeconds(ROUND_DURATION);
-        const newRound = roundNumber + 1;
-        setRoundNumber(newRound);
+        setRoundNumber((prev) => prev + 1);
         setBsOccurredThisRound(false); // new round
-        
-        // Force black swan in round 2 for testing
-        if (newRound === 2 && !blackSwanForcedRef.current) {
-          blackSwanForcedRef.current = true;
-          console.log("[GameController] Forcing black swan in round 2...");
-          setTimeout(() => {
-            generateEvent({ forceBlackSwan: true })
-              .then((result) => {
-                if (result.success && result.event) {
-                  console.log("[GameController] Forced black swan event:", result.event);
-                  setBsOccurredThisRound(true);
-                  setBlackSwan(result.event);
-                  handleEvent(result.event);
-                } else {
-                  console.error("[GameController] Failed to generate forced black swan");
-                }
-              })
-              .catch((error) => {
-                console.error("[GameController] Error generating forced black swan:", error);
-              });
-          }, 2000); // Wait 2 seconds after round starts
-        }
       }
     }
   };
@@ -431,26 +384,24 @@ export default function GameController({
         <div><strong>Title:</strong> {gameState.title}</div>
       </div>
 
-      {/* If parent is controlling active state, gray out the internal Start/Stop */}
-      <div style={buttonsStyle}>
-        <button
-          style={{
-            ...startStopStyle,
-            opacity: controlledActive !== undefined ? 0.5 : 1,
-            pointerEvents: controlledActive !== undefined ? "none" : "auto",
-          }}
-          onClick={active ? stopGame : startGame}
-        >
-          {isActive ? "Stop" : "Start"}
-        </button>
-        <button
-          style={!isActive ? { ...pauseResumeStyle, backgroundColor: "#ccc", cursor: "not-allowed" } : pauseResumeStyle}
-          onClick={togglePause}
-          disabled={!isActive}
-        >
-          {paused && !roundOver ? "Resume" : "Pause"}
-        </button>
-      </div>
+      {/* Only show buttons if parent is NOT controlling active state */}
+      {controlledActive === undefined && (
+        <div style={buttonsStyle}>
+          <button
+            style={startStopStyle}
+            onClick={active ? stopGame : startGame}
+          >
+            {isActive ? "Stop" : "Start"}
+          </button>
+          <button
+            style={!isActive ? { ...pauseResumeStyle, backgroundColor: "#ccc", cursor: "not-allowed" } : pauseResumeStyle}
+            onClick={togglePause}
+            disabled={!isActive}
+          >
+            {paused && !roundOver ? "Resume" : "Pause"}
+          </button>
+        </div>
+      )}
 
       {eventMessage && <div style={getEventStyle(eventMessage.type)}>{eventMessage.text}</div>}
 

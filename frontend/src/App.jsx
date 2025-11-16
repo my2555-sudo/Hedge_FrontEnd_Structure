@@ -498,20 +498,21 @@ function AppInner() {
         )}
 
         <TimerDisplay seconds={secondsLeft} active={roundActive} />
-        {/* Drive GameController’s active state from here so BlackSwan hook runs */}
+        {/* Drive GameController's active state from here so BlackSwan hook runs */}
         <GameController controlledActive={roundActive} onRoundEnd={handleRoundEnd} />
 
-        <div style={{ marginTop: 12 }}>
-          <button className="btn start" onClick={startRound}>
+        <div style={{ marginTop: 12, display: "flex", gap: "8px", justifyContent: "center" }}>
+          <button className="btn start" onClick={startRound} style={{ padding: "8px 16px", borderRadius: "6px", fontSize: "14px", cursor: "pointer", color: "white", backgroundColor: "#28a745", border: "none" }}>
             Start
           </button>
-          <button className="btn pause" onClick={pauseRound} disabled={!roundActive}>
+          <button className="btn pause" onClick={pauseRound} disabled={!roundActive} style={{ padding: "8px 16px", borderRadius: "6px", fontSize: "14px", cursor: roundActive ? "pointer" : "not-allowed", color: "white", backgroundColor: roundActive ? "#ffc107" : "#ccc", border: "none" }}>
             Pause
           </button>
           <button
             className="btn resume"
             onClick={resumeRound}
             disabled={roundActive || secondsLeft <= 0}
+            style={{ padding: "8px 16px", borderRadius: "6px", fontSize: "14px", cursor: (roundActive || secondsLeft <= 0) ? "not-allowed" : "pointer", color: "white", backgroundColor: (roundActive || secondsLeft <= 0) ? "#ccc" : "#ffc107", border: "none" }}
           >
             Resume
           </button>
