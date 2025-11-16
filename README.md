@@ -10,8 +10,9 @@
 Hedge is a simulated financial trading platform that allows beginner investors to explore the workings of the stock market by making artificial trades (buy and sell orders) in a specified amount of time (5, 10, or 15 minutes). Occasionally, Black Swan events will occur that cause stock prices for jump or fall, and the player will have to adjust their trades accordingly. They will also receive feedback during the game from an AI coach and will be able to see their net P/L.
 
 ## Setup
-1. `npm install`
-2. `npm run dev`
+1. `cd frontend`
+2. `npm install`
+3. `npm run dev`
 
 ## Mock Data
 Our app uses mock data for:
