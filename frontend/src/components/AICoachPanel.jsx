@@ -66,29 +66,29 @@ export default function AICoachPanel({
   }, [portfolio]);
 
   return (
-    <div className="glass" style={{padding:"12px"}}>
+    <div className="glass" style={{padding:"10px"}}>
       <div className="PanelTitle">
         AI COACH 
-        <span style={{ fontSize: "10px", opacity: 0.7, marginLeft: "8px" }}>
+        <span style={{ fontSize: "9px", opacity: 0.7, marginLeft: "6px" }}>
           {feedbackMode === "serious" ? "📊" : "🎮"}
         </span>
       </div>
-      <div style={{padding:"8px 12px"}}>
+      <div style={{padding:"6px 10px"}}>
         {/* Event Summary */}
         {lastEvent ? (
           <>
-            <div style={{opacity:.8, fontSize:11, marginBottom:4, fontWeight:"bold"}}>
+            <div style={{opacity:.8, fontSize:10, marginBottom:3, fontWeight:"600"}}>
               {lastEvent.type} • {(lastEvent.impactPct*100).toFixed(1)}% Impact
             </div>
-            <div style={{fontSize:12, marginBottom:6, color:"#e0e0e0"}}>
+            <div style={{fontSize:11, marginBottom:4, color:"var(--text-muted)"}}>
               {lastEvent.title}
             </div>
-            <div style={{fontSize:11, marginBottom:8, opacity:.85, fontStyle:"italic"}}>
+            <div style={{fontSize:10, marginBottom:6, opacity:.85, fontStyle:"italic"}}>
               {eventSummary}
             </div>
           </>
         ) : (
-          <div style={{fontSize:12, marginBottom:8, opacity:.7}}>
+          <div style={{fontSize:11, marginBottom:6, opacity:.7}}>
             Waiting for first signal...
           </div>
         )}
@@ -96,17 +96,18 @@ export default function AICoachPanel({
         {/* Player Reaction Analysis */}
         {lastEvent && playerReaction && (
           <div style={{
-            marginTop:8,
-            marginBottom:8,
-            padding:"6px 8px",
-            background:"rgba(255,255,255,0.05)",
+            marginTop:6,
+            marginBottom:6,
+            padding:"5px 6px",
+            background:"rgba(255,255,255,0.04)",
             borderRadius:4,
-            fontSize:11
+            fontSize:10,
+            border:"1px solid var(--border)"
           }}>
-            <div style={{opacity:.9, marginBottom:2}}>📊 Your Reaction:</div>
-            <div style={{fontWeight:"bold", color:"var(--accent)"}}>{playerReaction}</div>
+            <div style={{opacity:.9, marginBottom:2, fontSize:9}}>📊 Your Reaction:</div>
+            <div style={{fontWeight:"600", color:"var(--accent)", fontSize:10}}>{playerReaction}</div>
             {tradesSinceLastEvent > 0 && (
-              <div style={{fontSize:10, opacity:.7, marginTop:4}}>
+              <div style={{fontSize:9, opacity:.7, marginTop:3}}>
                 {tradesSinceLastEvent} trade(s) since event
               </div>
             )}
@@ -116,11 +117,11 @@ export default function AICoachPanel({
         {/* Portfolio Summary */}
         {portfolioAnalysis && (
           <div style={{
-            marginTop:8,
-            fontSize:10,
+            marginTop:6,
+            fontSize:9,
             opacity:.75,
-            paddingTop:8,
-            borderTop:"1px solid rgba(255,255,255,0.1)"
+            paddingTop:6,
+            borderTop:"1px solid var(--border)"
           }}>
             Portfolio: {portfolioAnalysis.sectors} sectors • 
             Top: {portfolioAnalysis.dominantSector} ({portfolioAnalysis.concentration}%)
@@ -128,7 +129,7 @@ export default function AICoachPanel({
         )}
 
         {/* P/L Display */}
-        <div style={{marginTop:8, fontSize:12, opacity:.85}}>
+        <div style={{marginTop:6, fontSize:11, opacity:.85}}>
           Session P/L: <b style={{color: totalPnL>=0 ? "var(--good)" : "var(--bad)"}}>
             {totalPnL>=0 ? "+" : ""}{totalPnL.toFixed(2)}
           </b>

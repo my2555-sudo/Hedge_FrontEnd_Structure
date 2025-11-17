@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const FMP_BASE_URL = "https://financialmodelingprep.com/api/v3";
 const FEAR_GREED_URL = "https://api.alternative.me/fng/?limit=1";
-
-const INDEX_SYMBOLS = ["^GSPC", "^NDX", "^DJI", "^VIX"];
 
 const FALLBACK_DATA = {
   indexes: [
@@ -25,14 +22,16 @@ const FALLBACK_DATA = {
   },
 };
 
-function pickIndexes(indexes = []) {
-  if (!Array.isArray(indexes)) return [];
-  const bySymbol = Object.fromEntries(
-    indexes
-      .filter((item) => item && item.symbol)
-      .map((item) => [item.symbol, item])
-  );
-  return INDEX_SYMBOLS.map((symbol) => bySymbol[symbol]).filter(Boolean);
+function normalizeMarketIndicators(profiles = []) {
+  if (!Array.isArray(profiles)) return [];
+  return profiles
+    .filter((item) => item && item.symbol && item.price !== undefined)
+    .map((item) => ({
+      symbol: item.symbol,
+      name: item.companyName || item.name || item.symbol,
+      price: item.price || 0,
+      changesPercentage: item.changePercentage || item.changesPercentage || 0,
+    }));
 }
 
 function normalizeSectors(sectors = []) {
@@ -74,54 +73,51 @@ export function useMarketInsights({ refreshInterval = 120000 } = {}) {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const apiKey = import.meta.env.VITE_FMP_API_KEY || "demo";
-
     try {
       setInsights((prev) => ({ ...prev, loading: true, error: null }));
-      const [indexesRes, sectorsRes, sentimentRes] = await Promise.all([
-        fetch(`${FMP_BASE_URL}/quotes/index?apikey=${apiKey}`, {
+      
+      // Only fetch Fear & Greed API (free, no key required)
+      // Use sample data for indexes and sectors (FMP requires paid tier)
+      const sentimentResult = await Promise.allSettled([
+        fetch(FEAR_GREED_URL, { 
           signal: controller.signal,
-        }),
-        fetch(`${FMP_BASE_URL}/sectors-performance?apikey=${apiKey}`, {
-          signal: controller.signal,
-        }),
-        fetch(FEAR_GREED_URL, { signal: controller.signal }),
+        }).then(res => res.ok ? res.json() : Promise.reject(new Error(`Fear & Greed API: ${res.status}`))),
       ]);
 
-      if (!indexesRes.ok || !sectorsRes.ok || !sentimentRes.ok) {
-        throw new Error("Failed to fetch market insights");
+      const [sentimentResultData] = sentimentResult;
+      
+      // Always use sample data for indexes and sectors (FMP free tier doesn't include these)
+      const indexes = normalizeMarketIndicators(FALLBACK_DATA.indexes);
+      const sectors = normalizeSectors(FALLBACK_DATA.sectors);
+
+      // Process Fear & Greed (free API)
+      let fearGreed = null;
+      let sentimentError = null;
+      if (sentimentResultData.status === "fulfilled") {
+        const sentimentJson = sentimentResultData.value;
+        fearGreed = parseFearGreed(sentimentJson);
+        if (!fearGreed && sentimentJson?.data?.length === 0) {
+          sentimentError = "No Fear & Greed data available";
+        }
+      } else {
+        sentimentError = sentimentResultData.reason?.message || "Failed to fetch sentiment";
       }
-
-      const [indexesJson, sectorsJson, sentimentJson] = await Promise.all([
-        indexesRes.json(),
-        sectorsRes.json(),
-        sentimentRes.json(),
-      ]);
-
-      const indexesError = indexesJson?.["Error Message"];
-      const sectorsError = sectorsJson?.["Error Message"];
-      const sentimentError = sentimentJson?.["Error Message"];
-
-      if (indexesError || sectorsError || sentimentError) {
-        throw new Error(
-          indexesError || sectorsError || sentimentError || "API returned an error payload"
-        );
-      }
-
+      
       setInsights({
         loading: false,
-        error: null,
-        indexes: pickIndexes(indexesJson),
-        sectors: normalizeSectors(sectorsJson?.sectorPerformance),
-        fearGreed: parseFearGreed(sentimentJson),
+        error: sentimentError || null,
+        indexes,
+        sectors,
+        fearGreed: fearGreed || FALLBACK_DATA.fearGreed,
         lastUpdated: new Date(),
       });
     } catch (error) {
       if (error.name === "AbortError") return;
+      console.warn("Market insights fetch error:", error);
       setInsights({
         loading: false,
         error: error.message || "Unable to load market insights",
-        indexes: pickIndexes(FALLBACK_DATA.indexes),
+        indexes: normalizeMarketIndicators(FALLBACK_DATA.indexes),
         sectors: normalizeSectors(FALLBACK_DATA.sectors),
         fearGreed: FALLBACK_DATA.fearGreed,
         lastUpdated: new Date(),
