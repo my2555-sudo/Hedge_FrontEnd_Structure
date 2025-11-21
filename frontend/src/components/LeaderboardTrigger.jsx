@@ -14,10 +14,10 @@ export default function LeaderboardTrigger({ leaderboard, playerName, roundNumbe
   const sorted = [...leaderboard].sort((a, b) => b.portfolioValue - a.portfolioValue);
 
   const getRankStyle = (rank) => {
-    if (rank === 1) return { color: "#FFD700", fontWeight: "bold", textShadow: "0 0 8px #FFD700" };
-    if (rank === 2) return { color: "#C0C0C0", fontWeight: "bold", textShadow: "0 0 6px #C0C0C0" };
-    if (rank === 3) return { color: "#CD7F32", fontWeight: "bold", textShadow: "0 0 4px #CD7F32" };
-    return { color: "#ddd" };
+    if (rank === 1) return { color: "#d4a574", fontWeight: "600" };
+    if (rank === 2) return { color: "var(--text-muted)", fontWeight: "600" };
+    if (rank === 3) return { color: "var(--text-muted)", fontWeight: "600" };
+    return { color: "var(--text-muted)" };
   };
 
   const modalContent = (
@@ -25,61 +25,56 @@ export default function LeaderboardTrigger({ leaderboard, playerName, roundNumbe
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.75)",
+        backgroundColor: "rgba(0, 0, 0, 0.7)",
+        backdropFilter: "blur(8px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         zIndex: 99999,
         opacity: visible ? 1 : 0,
-        transition: "opacity 0.5s ease",
+        transition: "opacity 0.4s ease",
         padding: "16px",
       }}
     >
       <div
+        className="glass"
         style={{
-          backgroundColor: "#1c1c1c",
           borderRadius: "16px",
-          padding: "32px 24px",
-          color: "white",
+          padding: "28px 24px",
+          color: "var(--text)",
           width: "100%",
-          maxWidth: "520px",
-          boxShadow: "0 0 25px rgba(0,0,0,0.5)",
+          maxWidth: "540px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
           textAlign: "center",
-          transform: visible ? "translateY(0)" : "translateY(40px)",
-          transition: "transform 0.5s ease",
+          transform: visible ? "translateY(0) scale(1)" : "translateY(40px) scale(0.95)",
+          transition: "transform 0.4s ease",
+          border: "1px solid var(--border)",
         }}
       >
-        <h2
-          style={{
-            marginBottom: "20px",
-            fontSize: "22px",
-            fontWeight: "600",
-            letterSpacing: "0.5px",
-          }}
-        >
-          Round {roundNumber} Complete!
-        </h2>
+        <div className="PanelTitle" style={{ marginBottom: "20px", fontSize: "16px", fontWeight: "600", letterSpacing: "0.05em" }}>
+          🎯 Round {roundNumber} Complete!
+        </div>
 
-        <div style={{ overflowX: "auto" }}>
+        <div style={{ overflowX: "auto", marginBottom: "20px" }}>
           <table
             style={{
               width: "100%",
               borderCollapse: "collapse",
-              fontSize: "15px",
+              fontSize: "13px",
               minWidth: "400px",
             }}
           >
             <thead>
               <tr
                 style={{
-                  borderBottom: "1px solid #666",
-                  color: "#aaa",
+                  borderBottom: "1px solid var(--border)",
+                  color: "var(--text-muted)",
                 }}
               >
-                <th style={{ textAlign: "left", padding: "10px 12px", minWidth: "40px" }}>#</th>
-                <th style={{ textAlign: "left", padding: "10px 12px", minWidth: "100px" }}>Player</th>
-                <th style={{ textAlign: "center", padding: "10px 12px", minWidth: "120px" }}>Title</th>
-                <th style={{ textAlign: "right", padding: "10px 12px", minWidth: "100px" }}>Portfolio</th>
+                <th style={{ textAlign: "left", padding: "10px 12px", minWidth: "40px", fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em" }}>#</th>
+                <th style={{ textAlign: "left", padding: "10px 12px", minWidth: "100px", fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em" }}>Player</th>
+                <th style={{ textAlign: "center", padding: "10px 12px", minWidth: "120px", fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em" }}>Title</th>
+                <th style={{ textAlign: "right", padding: "10px 12px", minWidth: "100px", fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em" }}>Portfolio</th>
               </tr>
             </thead>
             <tbody>
@@ -94,45 +89,52 @@ export default function LeaderboardTrigger({ leaderboard, playerName, roundNumbe
                     key={index}
                     style={{
                       backgroundColor: isTop
-                        ? "#3b2f00"
+                        ? "rgba(251, 191, 36, 0.1)"
                         : isEven
-                        ? "#222"
-                        : "#2b2b2b",
-                      boxShadow: isTop ? "0 0 20px #FFD700" : "none",
-                      outline: isPlayer ? "2px solid rgba(79, 195, 247, 0.6)" : "none",
-                      animation: visible ? `fadeSlideIn 0.6s ease ${0.15 * index}s both` : "none",
-                      transition: "background-color 0.3s ease, box-shadow 0.3s ease",
+                        ? "rgba(255,255,255,0.02)"
+                        : "transparent",
+                      borderBottom: "1px solid var(--border)",
+                      boxShadow: isTop ? "0 2px 12px rgba(251, 191, 36, 0.2)" : "none",
+                      outline: isPlayer ? "2px solid rgba(107, 157, 209, 0.4)" : "none",
+                      outlineOffset: "-2px",
+                      animation: visible ? `fadeSlideIn 0.5s ease ${0.1 * index}s both` : "none",
+                      transition: "background-color 0.2s ease, box-shadow 0.2s ease",
                     }}
                     onMouseEnter={(e) =>
-                      (e.currentTarget.style.backgroundColor = isTop ? "#4d3b00" : "#333")
+                      (e.currentTarget.style.backgroundColor = isTop 
+                        ? "rgba(251, 191, 36, 0.15)" 
+                        : "rgba(255,255,255,0.05)")
                     }
                     onMouseLeave={(e) =>
                       (e.currentTarget.style.backgroundColor = isTop
-                        ? "#3b2f00"
+                        ? "rgba(251, 191, 36, 0.1)"
                         : isEven
-                        ? "#222"
-                        : "#2b2b2b")
+                        ? "rgba(255,255,255,0.02)"
+                        : "transparent")
                     }
                   >
-                    <td style={{ textAlign: "left", padding: "10px 12px", ...getRankStyle(rank) }}>
+                    <td style={{ textAlign: "left", padding: "12px", ...getRankStyle(rank), fontSize: "14px" }}>
                       {rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}
                     </td>
-                    <td style={{ textAlign: "left", padding: "10px 12px", fontWeight: "500" }}>
+                    <td style={{ textAlign: "left", padding: "12px", fontWeight: isPlayer ? "600" : "500", color: isPlayer ? "var(--accent)" : "var(--text)" }}>
                       {entry.playerName}
                       {isPlayer && (
-                        <span style={{ marginLeft: "6px", fontSize: "11px", color: "var(--accent, #4fc3f7)" }}>
+                        <span style={{ marginLeft: "6px", fontSize: "10px", color: "var(--accent)", opacity: 0.8 }}>
                           (You)
                         </span>
                       )}
                     </td>
-                    <td style={{ textAlign: "center", padding: "10px 12px", fontStyle: "italic" }}>
+                    <td style={{ textAlign: "center", padding: "12px", fontStyle: "italic", color: "var(--text-muted)", fontSize: "12px" }}>
                       {entry.title}
                     </td>
                     <td
                       style={{
                         textAlign: "right",
-                        padding: "10px 12px",
+                        padding: "12px",
                         fontVariantNumeric: "tabular-nums",
+                        fontWeight: "600",
+                        color: "var(--text)",
+                        fontSize: "13px",
                       }}
                     >
                       ${entry.portfolioValue.toLocaleString()}
@@ -145,24 +147,17 @@ export default function LeaderboardTrigger({ leaderboard, playerName, roundNumbe
         </div>
 
         <button
+          className="btn btn-start"
           onClick={() => {
             setVisible(false);
             setTimeout(onResume, 400);
           }}
           style={{
-            marginTop: "28px",
-            backgroundColor: "#28a745",
-            color: "white",
-            padding: "10px 22px",
-            border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
-            fontSize: "15px",
-            fontWeight: "bold",
-            transition: "background-color 0.3s ease",
+            marginTop: "20px",
+            padding: "10px 24px",
+            fontSize: "13px",
+            minWidth: "120px",
           }}
-          onMouseOver={(e) => (e.target.style.backgroundColor = "#34c759")}
-          onMouseOut={(e) => (e.target.style.backgroundColor = "#28a745")}
         >
           Continue
         </button>

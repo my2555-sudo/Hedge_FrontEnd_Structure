@@ -80,9 +80,6 @@ export default function AICoachPanel({
             <div style={{opacity:.8, fontSize:10, marginBottom:3, fontWeight:"600"}}>
               {lastEvent.type} • {(lastEvent.impactPct*100).toFixed(1)}% Impact
             </div>
-            <div style={{fontSize:11, marginBottom:4, color:"var(--text-muted)"}}>
-              {lastEvent.title}
-            </div>
             <div style={{fontSize:10, marginBottom:6, opacity:.85, fontStyle:"italic"}}>
               {eventSummary}
             </div>

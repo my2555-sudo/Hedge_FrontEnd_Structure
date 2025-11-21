@@ -2,9 +2,13 @@ import React from "react";
 
 export default function HeadlineCard({ event, onClick }) {
   const isMacro = event.type === "MACRO";
+  const impactPct = event.impactPct || event.baseImpactPct || 0;
+  const isPositive = impactPct > 0;
+  const isNegative = impactPct < 0;
+  
   return (
     <button
-      className={`nf-card ${isMacro ? "macro" : "micro"}`}
+      className={`nf-card ${isMacro ? "macro" : "micro"} ${isPositive ? "positive" : ""} ${isNegative ? "negative" : ""}`}
       onClick={() => onClick?.(event)}
       title={event.details}
     >

@@ -1,9 +1,26 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
-export default function TradeControls({ tickers, positions = {}, onTrade, disabled }) {
+export default function TradeControls({ tickers, positions = {}, onTrade, disabled, portfolio = [], cash = 0 }) {
   const [ticker, setTicker] = useState(tickers?.[0] || "");
   const [qty, setQty] = useState(1);
   const [err, setErr] = useState(""); // Store error message text
+
+  // Find current price for selected ticker
+  const currentStock = useMemo(() => {
+    return portfolio.find(p => p.ticker === ticker);
+  }, [portfolio, ticker]);
+
+  // Calculate cost/earnings
+  const tradeAmount = useMemo(() => {
+    if (!currentStock || qty < 1) return null;
+    return currentStock.price * qty;
+  }, [currentStock, qty]);
+
+  // Check if user has enough cash for buy
+  const hasEnoughCash = useMemo(() => {
+    if (!tradeAmount) return true;
+    return cash >= tradeAmount;
+  }, [cash, tradeAmount]);
 
   // Trade function with validation
   function tryTrade(kind) {
@@ -37,7 +54,7 @@ export default function TradeControls({ tickers, positions = {}, onTrade, disabl
 
       {/* click Buy/Sell button */}
       <button
-        className="Button"
+        className="Button Button-buy"
         disabled={disabled}
         onClick={() => tryTrade("BUY")}
       >
@@ -45,12 +62,23 @@ export default function TradeControls({ tickers, positions = {}, onTrade, disabl
       </button>
 
       <button
-        className="Button"
+        className="Button Button-sell"
         disabled={disabled}
         onClick={() => tryTrade("SELL")}
       >
         Sell
       </button>
+
+      {/* Trade Amount Display */}
+      {currentStock && tradeAmount && (
+        <div className="TradeAmountDisplay" style={{ gridColumn: "1 / -1" }}>
+          <span className="TradeAmountLabel">Trade Amount:</span>
+          <span className={`TradeAmountValue ${!hasEnoughCash ? 'insufficient-funds' : ''}`}>
+            ${tradeAmount.toFixed(2)}
+            {!hasEnoughCash && <span className="warning-text"> (Insufficient funds)</span>}
+          </span>
+        </div>
+      )}
 
       {/* Error message */}
       {err && (

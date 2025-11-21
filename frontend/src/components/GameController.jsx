@@ -403,7 +403,6 @@ export default function GameController({
         </div>
       )}
 
-      {eventMessage && <div style={getEventStyle(eventMessage.type)}>{eventMessage.text}</div>}
 
       {roundOver && (
         <LeaderboardTrigger

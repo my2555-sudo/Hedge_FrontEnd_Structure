@@ -10,6 +10,7 @@ import GameController from "./components/GameController.jsx";
 import AICoachPanel from "./components/AICoachPanel.jsx";
 import FeedbackModal from "./components/FeedbackModal.jsx";
 import StatsDashboard from "./components/StatsDashboard.jsx";
+import PnLChart from "./components/PnLChart.jsx";
 
 import { initialPortfolio } from "./data/mockPortfolio.js";
 import { EventProvider, useEventBus } from "./components/EventContext.jsx";
@@ -37,9 +38,12 @@ function AppInner() {
   // --- game state (top-level UI timer only) ---
   // All hooks must be called before any early returns (React Hooks rules)
   const ROUND_SECONDS = 30;
+  const GAME_DURATION = 300; // 10 rounds * 30 seconds
+  const TOTAL_ROUNDS = Math.floor(GAME_DURATION / ROUND_SECONDS); // 10 rounds
   const [secondsLeft, setSecondsLeft] = useState(ROUND_SECONDS);
   const [roundActive, setRoundActive] = useState(false);
   const [roundNumber, setRoundNumber] = useState(1);
+  const [gameOver, setGameOver] = useState(false);
 
   // global event bus
   const { events } = useEventBus();
@@ -305,6 +309,13 @@ function AppInner() {
 
   // Round control
   function startRound() {
+    if (gameOver) {
+      // Reset game completely if starting after game over
+      setRoundNumber(1);
+      setGameOver(false);
+      setRoundActive(false);
+      return;
+    }
     setLastEvent(null);
     setPctImpact(0);
     setSecondsLeft(ROUND_SECONDS);
@@ -316,12 +327,19 @@ function AppInner() {
   }
   
   // Handle round end (called from GameController)
-  async function handleRoundEnd({ roundNumber: endedRoundNumber }) {
+  async function handleRoundEnd({ roundNumber: endedRoundNumber, totalRounds }) {
     // Avoid double-processing the same round (React StrictMode / multiple calls)
     if (lastProcessedRoundRef.current === endedRoundNumber) {
       return;
     }
     lastProcessedRoundRef.current = endedRoundNumber;
+
+    // Check if game is over
+    if (endedRoundNumber >= totalRounds) {
+      setGameOver(true);
+      setRoundActive(false);
+      return;
+    }
 
     // Determine if player "survived" this round (basic rule)
     const survived = totalPnL >= lastRoundPnLRef.current || totalPnL >= 0;
@@ -499,22 +517,35 @@ function AppInner() {
 
         <TimerDisplay seconds={secondsLeft} active={roundActive} />
         {/* Drive GameController's active state from here so BlackSwan hook runs */}
-        <GameController controlledActive={roundActive} onRoundEnd={handleRoundEnd} />
+        <GameController controlledActive={roundActive && !gameOver} onRoundEnd={handleRoundEnd} />
+        
+        {/* Game Over Message */}
+        {gameOver && (
+          <div className="glass" style={{ padding: "16px", marginTop: "12px", textAlign: "center" }}>
+            <div style={{ fontSize: "16px", fontWeight: "600", color: "var(--accent)", marginBottom: "8px" }}>
+              🎉 Game Complete!
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+              All {TOTAL_ROUNDS} rounds finished. Final P/L: <span style={{ color: totalPnL >= 0 ? "var(--good)" : "var(--bad)", fontWeight: "600" }}>
+                {totalPnL >= 0 ? "+" : ""}${totalPnL.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
 
         <div style={{ marginTop: 12, display: "flex", gap: "8px", justifyContent: "center" }}>
-          <button className="btn start" onClick={startRound} style={{ padding: "8px 16px", borderRadius: "6px", fontSize: "14px", cursor: "pointer", color: "white", backgroundColor: "#28a745", border: "none" }}>
-            Start
+          <button className="btn btn-start" onClick={startRound}>
+            {gameOver ? "🔄 New Game" : "▶ Start"}
           </button>
-          <button className="btn pause" onClick={pauseRound} disabled={!roundActive} style={{ padding: "8px 16px", borderRadius: "6px", fontSize: "14px", cursor: roundActive ? "pointer" : "not-allowed", color: "white", backgroundColor: roundActive ? "#ffc107" : "#ccc", border: "none" }}>
-            Pause
+          <button className="btn btn-pause" onClick={pauseRound} disabled={!roundActive}>
+            ⏸ Pause
           </button>
           <button
-            className="btn resume"
+            className="btn btn-resume"
             onClick={resumeRound}
             disabled={roundActive || secondsLeft <= 0}
-            style={{ padding: "8px 16px", borderRadius: "6px", fontSize: "14px", cursor: (roundActive || secondsLeft <= 0) ? "not-allowed" : "pointer", color: "white", backgroundColor: (roundActive || secondsLeft <= 0) ? "#ccc" : "#ffc107", border: "none" }}
           >
-            Resume
+            ▶ Resume
           </button>
         </div>
 
@@ -528,106 +559,115 @@ function AppInner() {
         />
         
         {/* Feedback Mode Toggle */}
-        <div style={{
-          marginTop: 12,
-          padding: "8px",
-          background: "rgba(255,255,255,0.05)",
-          borderRadius: "6px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "8px"
-        }}>
-          <span style={{ fontSize: "11px", opacity: 0.8 }}>Feedback Mode:</span>
-          <button
-            onClick={() => setFeedbackMode(prev => prev === "serious" ? "playful" : "serious")}
-            style={{
-              flex: 1,
-              padding: "6px 12px",
-              background: feedbackMode === "serious" 
-                ? "rgba(79, 195, 247, 0.3)" 
-                : "rgba(255,255,255,0.1)",
-              border: `1px solid ${feedbackMode === "serious" ? "var(--accent)" : "rgba(255,255,255,0.2)"}`,
-              borderRadius: "4px",
-              color: "white",
-              fontSize: "11px",
-              cursor: "pointer",
-              transition: "all 0.2s",
-              fontWeight: feedbackMode === "serious" ? 600 : 400
-            }}
-            onMouseOver={(e) => {
-              if (feedbackMode !== "serious") {
-                e.target.style.background = "rgba(255,255,255,0.15)";
-              }
-            }}
-            onMouseOut={(e) => {
-              if (feedbackMode !== "serious") {
-                e.target.style.background = "rgba(255,255,255,0.1)";
-              }
-            }}
-          >
-            📊 Serious
-          </button>
-          <button
-            onClick={() => setFeedbackMode(prev => prev === "playful" ? "serious" : "playful")}
-            style={{
-              flex: 1,
-              padding: "6px 12px",
-              background: feedbackMode === "playful" 
-                ? "rgba(255, 193, 7, 0.3)" 
-                : "rgba(255,255,255,0.1)",
-              border: `1px solid ${feedbackMode === "playful" ? "#ffc107" : "rgba(255,255,255,0.2)"}`,
-              borderRadius: "4px",
-              color: "white",
-              fontSize: "11px",
-              cursor: "pointer",
-              transition: "all 0.2s",
-              fontWeight: feedbackMode === "playful" ? 600 : 400
-            }}
-            onMouseOver={(e) => {
-              if (feedbackMode !== "playful") {
-                e.target.style.background = "rgba(255,255,255,0.15)";
-              }
-            }}
-            onMouseOut={(e) => {
-              if (feedbackMode !== "playful") {
-                e.target.style.background = "rgba(255,255,255,0.1)";
-              }
-            }}
-          >
-            🎮 Playful
-          </button>
-        </div>
-        
         {/* Feedback button */}
         {lastEvent && (
           <button 
-            className="btn" 
+            className="btn btn-feedback" 
             onClick={() => setFeedbackModalOpen(true)}
             style={{ marginTop: 8, width: "100%" }}
           >
             💡 Get Feedback ({feedbackMode === "serious" ? "📊" : "🎮"})
           </button>
         )}
+        
+        <div style={{
+          marginTop: 12,
+          padding: "8px",
+          background: "rgba(255,255,255,0.05)",
+          borderRadius: "6px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px"
+        }}>
+          <span style={{ fontSize: "11px", opacity: 0.8 }}>Feedback Mode:</span>
+          <div style={{
+            display: "flex",
+            gap: "8px"
+          }}>
+            <button
+              onClick={() => setFeedbackMode(prev => prev === "serious" ? "playful" : "serious")}
+              style={{
+                flex: 1,
+                padding: "6px 12px",
+                background: feedbackMode === "serious" 
+                  ? "rgba(79, 195, 247, 0.3)" 
+                  : "rgba(255,255,255,0.1)",
+                border: `1px solid ${feedbackMode === "serious" ? "var(--accent)" : "rgba(255,255,255,0.2)"}`,
+                borderRadius: "4px",
+                color: "white",
+                fontSize: "11px",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                fontWeight: feedbackMode === "serious" ? 600 : 400
+              }}
+              onMouseOver={(e) => {
+                if (feedbackMode !== "serious") {
+                  e.target.style.background = "rgba(255,255,255,0.15)";
+                }
+              }}
+              onMouseOut={(e) => {
+                if (feedbackMode !== "serious") {
+                  e.target.style.background = "rgba(255,255,255,0.1)";
+                }
+              }}
+            >
+              📊 Serious
+            </button>
+            <button
+              onClick={() => setFeedbackMode(prev => prev === "playful" ? "serious" : "playful")}
+              style={{
+                flex: 1,
+                padding: "6px 12px",
+                background: feedbackMode === "playful" 
+                  ? "rgba(255, 193, 7, 0.3)" 
+                  : "rgba(255,255,255,0.1)",
+                border: `1px solid ${feedbackMode === "playful" ? "#ffc107" : "rgba(255,255,255,0.2)"}`,
+                borderRadius: "4px",
+                color: "white",
+                fontSize: "11px",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                fontWeight: feedbackMode === "playful" ? 600 : 400
+              }}
+              onMouseOver={(e) => {
+                if (feedbackMode !== "playful") {
+                  e.target.style.background = "rgba(255,255,255,0.15)";
+                }
+              }}
+              onMouseOut={(e) => {
+                if (feedbackMode !== "playful") {
+                  e.target.style.background = "rgba(255,255,255,0.1)";
+                }
+              }}
+            >
+              🎮 Playful
+            </button>
+          </div>
+        </div>
       </section>
 
       {/* Center column: global feed */}
       <section className="CenterFeed glass">
-        <div className="PanelTitle">
-          NEWS HEADLINES (AI) <span className="count">{events.length}</span>
-        </div>
         <NewsFeed events={events} onSelect={(ev) => setLastEvent(ev)} />
+        
+        {/* P/L Chart */}
+        <PnLChart
+          totalPnL={totalPnL}
+          pnlHistory={pnlHistory}
+        />
       </section>
 
       {/* Right column: portfolio */}
       <section className="RightPortfolio glass">
         <div className="PanelTitle">PORTFOLIO</div>
-        <PortfolioTable rows={portfolio} flashTicker={flashTicker} />
+        <PortfolioTable rows={portfolio} flashTicker={flashTicker} cash={cash} />
         <TradeControls
           tickers={tickers}
           positions={positionsMap}
           onTrade={handleTrade}
-          disabled={!roundActive}
+          disabled={!roundActive || gameOver}
+          portfolio={portfolio}
+          cash={cash}
         />
         <TotalPnLDisplay value={totalPnL} />
         <div className="CashDisplay">💵 Cash: ${cash.toFixed(2)}</div>
