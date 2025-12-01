@@ -10,12 +10,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies
-# NOTE: We assume the build context is the Hedge_FrontEnd_Structure directory
+# NOTE: We assume the build context is the backend directory
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code into the container
-COPY . .
+# Copy the backend application code into a package directory
+COPY . /app/backend
+
+# Ensure Python can import the `backend` package
+ENV PYTHONPATH=/app
 
 # Environment variables
 ENV PORT=8000
