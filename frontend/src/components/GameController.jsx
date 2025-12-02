@@ -66,6 +66,7 @@ export default function GameController({
   // Black Swan UI/state
   const [blackSwan, setBlackSwan] = useState(null);
   const [bsOccurredThisRound, setBsOccurredThisRound] = useState(false);
+  const blackSwanForcedRef = useRef(false);
 
   // parent-controlled active flag (if provided)
   const isActive = controlledActive ?? active;
@@ -138,7 +139,28 @@ export default function GameController({
     };
   }, [isActive, paused, roundOver, emitEvents]);
 
-  // Removed forced black swan in round 2 - now uses normal frequency
+  // Force black swan in round 2 for testing
+  useEffect(() => {
+    if (roundNumber === 2 && isActive && !paused && !blackSwanForcedRef.current) {
+      blackSwanForcedRef.current = true;
+      // Wait 2 seconds after round 2 starts, then trigger black swan
+      const timer = setTimeout(() => {
+        generateEvent({ forceBlackSwan: true })
+          .then((result) => {
+            if (result.success && result.event) {
+              setBsOccurredThisRound(true);
+              setBlackSwan(result.event);
+              handleEvent(result.event);
+            }
+          })
+          .catch((error) => {
+            console.error("Error generating forced black swan:", error);
+          });
+      }, 2000); // Wait 2 seconds after round 2 starts
+
+      return () => clearTimeout(timer);
+    }
+  }, [roundNumber, isActive, paused]);
 
   // --- Black Swan emitter (rare, Poisson-timed) ---
   // Only active when game is active AND not paused
@@ -225,6 +247,7 @@ export default function GameController({
     setLeaderboard([]);
     setBsOccurredThisRound(false);
     setBlackSwan(null);
+    blackSwanForcedRef.current = false; // Reset forced flag
 
     // kick off with one immediate event so feed isn't empty
     generateEvent({ type: "MACRO" })
