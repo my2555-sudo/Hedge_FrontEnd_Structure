@@ -25,6 +25,8 @@ export default function BlackSwanModal({ event, open, onChoose }) {
         left: 0,
         right: 0,
         bottom: 0,
+        width: "100vw",
+        height: "100vh",
         background: "rgba(0, 0, 0, 0.75)",
         display: "flex",
         alignItems: "center",
@@ -35,7 +37,8 @@ export default function BlackSwanModal({ event, open, onChoose }) {
         overflow: "hidden",
         padding: "20px",
         boxSizing: "border-box",
-        margin: 0
+        margin: 0,
+        pointerEvents: "auto"
       }}
       onClick={(e) => {
         // Prevent closing on background click - user must make a choice
@@ -55,9 +58,11 @@ export default function BlackSwanModal({ event, open, onChoose }) {
           border: "2px solid rgba(216, 27, 96, 0.3)",
           animation: "slideUp 0.3s ease-out",
           position: "relative",
-          margin: "auto",
+          margin: "0 auto",
           maxHeight: "90vh",
-          overflow: "auto"
+          overflow: "auto",
+          transform: "translateY(0)",
+          flexShrink: 0
         }}
         onClick={(e) => e.stopPropagation()}
       >
