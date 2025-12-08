@@ -346,7 +346,18 @@ function AppInner() {
       {/* Left column */}
       <section className="LeftRail glass">
         <div className="Avatar">
-          <div className="AvatarCircle">🙂</div>
+          <div className="AvatarCircle">
+            <img 
+              src="/logo.png" 
+              alt="Hedge Logo" 
+              style={{ 
+                width: '90%', 
+                height: '90%', 
+                objectFit: 'contain',
+                borderRadius: '50%'
+              }} 
+            />
+          </div>
           <div className="GameTitle">HEDGE</div>
         </div>
         
