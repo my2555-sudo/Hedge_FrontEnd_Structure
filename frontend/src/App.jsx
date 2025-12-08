@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
-import TimerDisplay from "./components/TimerDisplay.jsx";
 import NewsFeed from "./components/NewsFeed.jsx";
 import PortfolioTable from "./components/PortfolioTable.jsx";
 import TradeControls from "./components/TradeControls.jsx";
@@ -19,30 +18,21 @@ import { useGameContext } from "./contexts/GameContext.jsx";
 import { usePriceSnapshots } from "./hooks/usePriceSnapshots.js";
 import { getTickers } from "./api/tickers.js";
 import LoginPage from "./components/LoginPage.jsx";
-import { saveRoundScore as apiSaveRoundScore } from "./api/roundScores.js";
 
 function AppInner() {
   const { user, profile, loading, signOut } = useAuth();
   const {
     currentGameId,
-    currentRoundId,
     currentParticipantId,
-    tickerIdMap,
     setTickerIdMap,
     initializeGame,
-    initializeRound,
-    endCurrentRound,
   } = useGameContext();
   const { captureSnapshots } = usePriceSnapshots();
 
   // --- game state (top-level UI timer only) ---
   // All hooks must be called before any early returns (React Hooks rules)
-  const ROUND_SECONDS = 30;
-  const GAME_DURATION = 300; // 10 rounds * 30 seconds
-  const TOTAL_ROUNDS = Math.floor(GAME_DURATION / ROUND_SECONDS); // 10 rounds
-  const [secondsLeft, setSecondsLeft] = useState(ROUND_SECONDS);
-  const [roundActive, setRoundActive] = useState(false);
-  const [roundNumber, setRoundNumber] = useState(1);
+  const GAME_DURATION = 300; // 5 minutes
+  const [gameActive, setGameActive] = useState(false);
   const [gameOver, setGameOver] = useState(false);
 
   // global event bus
@@ -78,15 +68,14 @@ function AppInner() {
   // Stats tracking
   const [pnlHistory, setPnlHistory] = useState([]); // [{timestamp, pnl}]
   const [streak, setStreak] = useState(0); // Survival streak
-  const lastRoundPnLRef = useRef(0);
+  const lastGamePnLRef = useRef(0);
 
   // ensure we only apply each event once to portfolio
   const lastAppliedIdRef = useRef(null);
 
-  // Ref to store current round ID (persists even if state is cleared)
-  const currentRoundIdRef = useRef(null);
+  // Ref to store current game ID (persists even if state is cleared)
+  const currentGameIdRef = useRef(null);
   const currentParticipantIdRef = useRef(null);
-  const lastProcessedRoundRef = useRef(null); // avoid double-processing same round
 
   // === Initialize Tickers (on app startup) ===
   useEffect(() => {
@@ -132,12 +121,11 @@ function AppInner() {
 
       // Auto-capture price snapshots (async, non-blocking)
       // Use ref values to ensure they're available even if state was cleared
-      const gameIdForSnapshot = currentGameId;
-      const roundIdForSnapshot = currentRoundIdRef.current || currentRoundId;
-      if (gameIdForSnapshot && roundIdForSnapshot) {
+      const gameIdForSnapshot = currentGameIdRef.current || currentGameId;
+      if (gameIdForSnapshot) {
         // Use updated portfolio
         setTimeout(() => {
-          captureSnapshots(updated, gameIdForSnapshot, roundIdForSnapshot).catch((err) => {
+          captureSnapshots(updated, gameIdForSnapshot, null).catch((err) => {
             console.warn("Failed to capture price snapshots:", err);
           });
         }, 0);
@@ -147,17 +135,11 @@ function AppInner() {
     });
   }
 
-  // Top-level UI countdown (independent of GameController internal timer)
-  useEffect(() => {
-    if (!roundActive) return;
-    if (secondsLeft <= 0) return;
-    const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => clearTimeout(t);
-  }, [roundActive, secondsLeft]);
+  // Game is now managed entirely by GameController, no separate timer needed
 
   // When new event arrives, apply price impact only once
   useEffect(() => {
-    if (!roundActive) return;
+    if (!gameActive) return;
     const ev = events[0];
     if (!ev) return;
 
@@ -172,7 +154,7 @@ function AppInner() {
     // Reset trade tracking for new event
     setTradesSinceLastEvent(0);
     lastEventIdRef.current = ev.runtimeId;
-  }, [events, roundActive]);
+  }, [events, gameActive]);
 
   // Trade (with cash validation)
   function handleTrade({ ticker, action, qty }) {
@@ -238,26 +220,28 @@ function AppInner() {
 
   // Track P/L history for dashboard
   useEffect(() => {
-    if (roundActive) {
+    if (gameActive) {
       const interval = setInterval(() => {
         setPnlHistory((prev) => {
           const newEntry = { timestamp: Date.now(), pnl: totalPnL };
           // Keep last 100 entries
           return [newEntry, ...prev].slice(0, 100);
         });
-      }, 5000); // Update every 5 seconds during active rounds
+      }, 5000); // Update every 5 seconds during active game
       
       return () => clearInterval(interval);
     }
-  }, [roundActive, totalPnL]);
+  }, [gameActive, totalPnL]);
 
   // === Game initialization (when game starts for first time) ===
   useEffect(() => {
-    if (roundActive && roundNumber === 1 && !currentGameId) {
+    if (gameActive && !currentGameId) {
       // Initialize game and participant
       initializeGame(STARTING_CASH)
         .then((result) => {
           if (result.success) {
+            // Store game ID in ref (persists even if state is cleared)
+            currentGameIdRef.current = result.gameId;
             // Store participant ID in ref
             currentParticipantIdRef.current = result.participantId;
           } else {
@@ -268,7 +252,7 @@ function AppInner() {
           console.error("Error initializing game:", err);
         });
     }
-  }, [roundActive, roundNumber, currentGameId, initializeGame]);
+  }, [gameActive, currentGameId, initializeGame]);
 
   // Update participant ID ref when it changes
   useEffect(() => {
@@ -277,129 +261,50 @@ function AppInner() {
     }
   }, [currentParticipantId]);
 
-  // === Round initialization (at start of each round) ===
+  // === Capture price snapshots at game start ===
   useEffect(() => {
-    if (roundActive && currentGameId && roundNumber) {
-      // Initialize round
-      initializeRound(roundNumber)
-        .then((result) => {
-          if (result.success) {
-            // Store round ID in ref (persists even if state is cleared)
-            currentRoundIdRef.current = result.roundId;
-            // Capture price snapshot at round start (use ref values to ensure they're available)
-            captureSnapshots(portfolio, currentGameId, result.roundId).catch((err) => {
-              console.warn("Failed to capture initial price snapshots:", err);
-            });
-          } else {
-            console.error("Failed to initialize round:", result.error);
-          }
-        })
-        .catch((err) => {
-          console.error("Error initializing round:", err);
+    if (gameActive && currentGameId) {
+      const gameIdForSnapshot = currentGameIdRef.current || currentGameId;
+      if (gameIdForSnapshot) {
+        // Capture initial price snapshot at game start
+        captureSnapshots(portfolio, gameIdForSnapshot, null).catch((err) => {
+          console.warn("Failed to capture initial price snapshots:", err);
         });
+      }
     }
-  }, [roundActive, currentGameId, roundNumber, initializeRound, captureSnapshots, portfolio]);
+  }, [gameActive, currentGameId, captureSnapshots, portfolio]);
 
-  // Update round ID ref when it changes
-  useEffect(() => {
-    if (currentRoundId) {
-      currentRoundIdRef.current = currentRoundId;
-    }
-  }, [currentRoundId]);
-
-  // Round control
-  function startRound() {
+  // Game control
+  function startGame() {
     if (gameOver) {
       // Reset game completely if starting after game over
-      setRoundNumber(1);
       setGameOver(false);
-      setRoundActive(false);
+      setGameActive(false);
       return;
     }
     setLastEvent(null);
     setPctImpact(0);
-    setSecondsLeft(ROUND_SECONDS);
     lastAppliedIdRef.current = null;
-    setRoundActive(true);
-    lastRoundPnLRef.current = totalPnL;
-    // Update roundNumber (if resuming from pause, don't increment)
-    // Note: roundNumber increments after each round ends, controlled by GameController or other logic
+    setGameActive(true);
+    lastGamePnLRef.current = totalPnL;
   }
   
-  // Handle round end (called from GameController)
-  async function handleRoundEnd({ roundNumber: endedRoundNumber, totalRounds }) {
-    // Avoid double-processing the same round (React StrictMode / multiple calls)
-    if (lastProcessedRoundRef.current === endedRoundNumber) {
-      return;
-    }
-    lastProcessedRoundRef.current = endedRoundNumber;
+  // Handle game end (called from GameController)
+  async function handleGameEnd({ portfolioValue, blackSwanOccurred }) {
+    setGameOver(true);
+    setGameActive(false);
 
-    // Check if game is over
-    if (endedRoundNumber >= totalRounds) {
-      setGameOver(true);
-      setRoundActive(false);
-      return;
-    }
-
-    // Determine if player "survived" this round (basic rule)
-    const survived = totalPnL >= lastRoundPnLRef.current || totalPnL >= 0;
+    // Determine if player "survived" the game (basic rule)
+    const survived = totalPnL >= lastGamePnLRef.current || totalPnL >= 0;
     setStreak((prev) => (survived ? prev + 1 : 0));
 
-    const roundIdToSave = currentRoundIdRef.current || currentRoundId;
+    const gameIdToSave = currentGameIdRef.current || currentGameId;
     const participantIdToSave = currentParticipantIdRef.current || currentParticipantId;
 
-    if (!roundIdToSave || !participantIdToSave) {
-      console.warn("Cannot save round score: missing IDs", {
-        roundId: roundIdToSave,
-        participantId: participantIdToSave,
-      });
-      return;
-    }
-
-    // Calculate reaction window and whether the player reacted
-    const REACTION_WINDOW_MS = 10000;
-    let reacted = false;
-    let reactionMs = null;
-
-    if (lastEvent && lastEvent.ts && recentTrades && recentTrades.length > 0) {
-      const tradesAfterEvent = recentTrades.filter(
-        (trade) =>
-          trade.timestamp >= lastEvent.ts &&
-          trade.timestamp <= lastEvent.ts + REACTION_WINDOW_MS
-      );
-
-      if (tradesAfterEvent.length > 0) {
-        const firstTrade = tradesAfterEvent.reduce((earliest, trade) => {
-          return trade.timestamp < earliest.timestamp ? trade : earliest;
-        }, tradesAfterEvent[0]);
-        reactionMs = firstTrade.timestamp - lastEvent.ts;
-        reacted = true;
-      }
-    }
-
-    const pnlDelta = totalPnL - (lastRoundPnLRef.current || 0);
-
-    try {
-      const result = await apiSaveRoundScore({
-        participant_id: participantIdToSave,
-        round_id: roundIdToSave,
-        pnl_delta: pnlDelta,
-        reacted,
-        reaction_ms: reactionMs,
-      });
-
-      if (!result.success) {
-        console.error("Failed to save round score:", result.error);
-      }
-    } catch (error) {
-      console.error("Error saving round score:", error);
-    }
-
-    // Capture price snapshot at round end (use ref values)
-    const roundIdForSnapshot = currentRoundIdRef.current || currentRoundId;
-    if (currentGameId && roundIdForSnapshot) {
+    // Capture final price snapshot at game end
+    if (gameIdToSave) {
       setPortfolio((currentPortfolio) => {
-        captureSnapshots(currentPortfolio, currentGameId, roundIdForSnapshot).catch(
+        captureSnapshots(currentPortfolio, gameIdToSave, null).catch(
           (err) => {
             console.warn("Failed to capture final price snapshots:", err);
           }
@@ -407,22 +312,13 @@ function AppInner() {
         return currentPortfolio;
       });
     }
-
-    // End round in backend and prepare for next round
-    try {
-      await endCurrentRound();
-    } catch (error) {
-      console.warn("Failed to end round:", error);
-    }
-
-    setRoundNumber((prev) => prev + 1);
   }
 
-  function pauseRound() {
-    setRoundActive(false);
+  function pauseGame() {
+    setGameActive(false);
   }
-  function resumeRound() {
-    if (secondsLeft > 0) setRoundActive(true);
+  function resumeGame() {
+    setGameActive(true);
   }
 
   // Show login page if not authenticated (after all hooks)
@@ -515,9 +411,8 @@ function AppInner() {
           </div>
         )}
 
-        <TimerDisplay seconds={secondsLeft} active={roundActive} />
         {/* Drive GameController's active state from here so BlackSwan hook runs */}
-        <GameController controlledActive={roundActive && !gameOver} onRoundEnd={handleRoundEnd} />
+        <GameController controlledActive={gameActive && !gameOver} onGameEnd={handleGameEnd} />
         
         {/* Game Over Message */}
         {gameOver && (
@@ -526,7 +421,7 @@ function AppInner() {
               🎉 Game Complete!
             </div>
             <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-              All {TOTAL_ROUNDS} rounds finished. Final P/L: <span style={{ color: totalPnL >= 0 ? "var(--good)" : "var(--bad)", fontWeight: "600" }}>
+              Final P/L: <span style={{ color: totalPnL >= 0 ? "var(--good)" : "var(--bad)", fontWeight: "600" }}>
                 {totalPnL >= 0 ? "+" : ""}${totalPnL.toFixed(2)}
               </span>
             </div>
@@ -534,16 +429,16 @@ function AppInner() {
         )}
 
         <div style={{ marginTop: 12, display: "flex", gap: "8px", justifyContent: "center" }}>
-          <button className="btn btn-start" onClick={startRound}>
+          <button className="btn btn-start" onClick={startGame}>
             {gameOver ? "🔄 New Game" : "▶ Start"}
           </button>
-          <button className="btn btn-pause" onClick={pauseRound} disabled={!roundActive}>
+          <button className="btn btn-pause" onClick={pauseGame} disabled={!gameActive}>
             ⏸ Pause
           </button>
           <button
             className="btn btn-resume"
-            onClick={resumeRound}
-            disabled={roundActive || secondsLeft <= 0}
+            onClick={resumeGame}
+            disabled={gameActive || gameOver}
           >
             ▶ Resume
           </button>
@@ -665,7 +560,7 @@ function AppInner() {
           tickers={tickers}
           positions={positionsMap}
           onTrade={handleTrade}
-          disabled={!roundActive || gameOver}
+          disabled={!gameActive || gameOver}
           portfolio={portfolio}
           cash={cash}
         />

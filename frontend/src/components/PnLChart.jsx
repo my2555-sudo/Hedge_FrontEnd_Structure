@@ -46,6 +46,7 @@ export default function PnLChart({
   }, [filteredHistory]);
 
   // Simple chart data points (max 20 points for visualization)
+  // Ensure newest points appear on the right by using chronological order (oldest → newest)
   const chartData = useMemo(() => {
     if (filteredHistory.length === 0) {
       // Create sample data if no history
@@ -55,11 +56,12 @@ export default function PnLChart({
       }));
     }
     
+    const chronological = [...filteredHistory].reverse(); // oldest first, newest last
     const maxPoints = 20;
-    const step = Math.max(1, Math.floor(filteredHistory.length / maxPoints));
-    return filteredHistory
-      .filter((_, i) => i % step === 0 || i === 0 || i === filteredHistory.length - 1)
-      .slice(0, maxPoints)
+    const step = Math.max(1, Math.floor(chronological.length / maxPoints));
+    return chronological
+      .filter((_, i) => i % step === 0 || i === 0 || i === chronological.length - 1)
+      .slice(-maxPoints)
       .map((entry, idx) => ({
         x: idx,
         y: entry.pnl
