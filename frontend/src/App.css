@@ -196,7 +196,20 @@ body::before {
 
 .LeftRail{ padding:12px; display:flex; flex-direction:column; gap:10px; }
 .CenterFeed{ overflow:hidden; display:flex; flex-direction:column; height: 100%; }
-.RightPortfolio{ display:flex; flex-direction:column; }
+.RightPortfolio{
+  display:flex;
+  flex-direction:column;
+  max-height: calc(100vh - 24px); /* match main layout height */
+  overflow-y:auto;                /* allow vertical scrolling within the panel */
+  overflow-x:hidden;
+}
+
+/* Make analytics dashboard area scrollable if content is tall */
+.AnalyticsDashboard{
+  max-height: 420px;
+  overflow-y:auto;
+  overflow-x:hidden;
+}
 
 .Avatar{ display:flex; align-items:center; gap:10px; padding:4px 0 8px; }
 .AvatarCircle{
@@ -778,7 +791,7 @@ body::before {
 
 .Controller{ display:flex; gap:8px; }
 
-.LeftRail, .CenterFeed, .RightPortfolio {
+.LeftRail, .CenterFeed {
   min-height: calc(100vh - 24px); /* 24 = 2*padding */
   max-height: calc(100vh - 24px);
   overflow-y: auto;
