@@ -16,38 +16,9 @@
 html,body,#root{ height:100%; }
 body{
   margin:0;
-  background: 
-    radial-gradient(1200px 800px at 20% -20%, rgba(107, 157, 209, 0.12), transparent),
-    radial-gradient(900px 700px at 110% 30%, rgba(139, 127, 184, 0.1), transparent),
-    radial-gradient(800px 600px at 50% 80%, rgba(212, 165, 116, 0.08), transparent),
-    linear-gradient(135deg, rgba(107, 157, 209, 0.03) 0%, rgba(139, 127, 184, 0.03) 50%, rgba(212, 165, 116, 0.03) 100%),
-              var(--bg);
-  background-size: 100% 100%, 100% 100%, 100% 100%, 200% 200%, 100% 100%;
-  background-position: 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%;
-  animation: bg-shift 20s ease-in-out infinite;
+  background: var(--bg);
   color:var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "PingFang SC", "Microsoft Yahei", Arial, sans-serif;
-  position: relative;
-  overflow-x: hidden;
-}
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(107, 157, 209, 0.03) 2px,
-      rgba(107, 157, 209, 0.03) 4px
-    );
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.5;
 }
 @keyframes bg-shift {
   0%, 100% {
@@ -65,80 +36,17 @@ body::before {
   grid-template-columns: clamp(200px, 16vw, 280px)
                          1fr
                          clamp(320px, 28vw, 480px);
-  gap: 16px;
-  padding: 16px;
-  position: relative;
-  z-index: 1;
-}
-.AppRoot::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    linear-gradient(90deg, transparent 0%, rgba(107,157,209,.05) 50%, transparent 100%),
-    linear-gradient(0deg, transparent 0%, rgba(139,127,184,.05) 50%, transparent 100%);
-  background-size: 200% 200%, 200% 200%;
-  animation: grid-scan 8s linear infinite;
-  pointer-events: none;
-  z-index: 0;
-}
-@keyframes grid-scan {
-  0% { background-position: 0% 0%, 0% 0%; }
-  100% { background-position: 100% 100%, 100% 100%; }
+  gap: 12px;
+  padding: 12px;
 }
 
 
 .glass{
-  background: linear-gradient(135deg, rgba(37,43,58,0.95), rgba(26,31,46,0.98));
-  border: 2px solid rgba(107,157,209,.3);
-  border-radius: 16px;
-  backdrop-filter: blur(10px);
-  box-shadow: 
-    0 4px 20px rgba(0,0,0,.4),
-    inset 0 1px 0 rgba(255,255,255,.1),
-    0 0 0 1px rgba(107,157,209,.1),
-    0 0 40px rgba(107,157,209,.15),
-    inset 0 0 60px rgba(107,157,209,.05);
-  position:relative;
-  transition: all 0.3s ease;
-  overflow: hidden;
-}
-.glass::before {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  background: linear-gradient(45deg, 
-    rgba(107,157,209,.5), 
-    rgba(139,127,184,.5), 
-    rgba(107,157,209,.5),
-    rgba(212,165,116,.5),
-    rgba(107,157,209,.5)
-  );
-  background-size: 400% 400%;
-  border-radius: 16px;
-  z-index: -1;
-  animation: border-glow 3s ease infinite;
-  opacity: 0.6;
-}
-@keyframes border-glow {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-.glass:hover {
-  box-shadow: 
-    0 6px 30px rgba(0,0,0,.5),
-    inset 0 1px 0 rgba(255,255,255,.15),
-    0 0 0 2px rgba(107,157,209,.3),
-    0 0 60px rgba(107,157,209,.25),
-    inset 0 0 80px rgba(107,157,209,.1);
-  border-color: rgba(107,157,209,.5);
-  transform: translateY(-2px);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  position: relative;
 }
 
 .PanelTitle{
@@ -215,9 +123,8 @@ body::before {
 .AvatarCircle{
   width:44px; height:44px; border-radius:50%;
   display:grid; place-items:center; font-size:24px;
-  background: linear-gradient(135deg, rgba(107,157,209,.15), rgba(139,127,184,.12));
-  border:1px solid rgba(107,157,209,.2);
-  box-shadow:0 2px 8px rgba(0,0,0,.15);
+  background: var(--panel);
+  border:1px solid var(--border);
 }
 .GameTitle{
   font-size:18px; font-weight:600; letter-spacing:.05em;
@@ -248,37 +155,11 @@ body::before {
   color:var(--good); 
   font-weight:700; 
   font-size:16px;
-  text-shadow: 0 0 10px rgba(107,191,138,.5),
-               0 0 20px rgba(107,191,138,.3);
-  animation: pulse-glow 2s ease-in-out infinite;
 }
 .PnlBad{ 
   color:var(--bad); 
   font-weight:700; 
   font-size:16px;
-  text-shadow: 0 0 10px rgba(217,119,111,.5),
-               0 0 20px rgba(217,119,111,.3);
-  animation: pulse-glow-bad 2s ease-in-out infinite;
-}
-@keyframes pulse-glow {
-  0%, 100% { 
-    text-shadow: 0 0 10px rgba(107,191,138,.5),
-                 0 0 20px rgba(107,191,138,.3);
-  }
-  50% { 
-    text-shadow: 0 0 15px rgba(107,191,138,.7),
-                 0 0 30px rgba(107,191,138,.5);
-  }
-}
-@keyframes pulse-glow-bad {
-  0%, 100% { 
-    text-shadow: 0 0 10px rgba(217,119,111,.5),
-                 0 0 20px rgba(217,119,111,.3);
-  }
-  50% { 
-    text-shadow: 0 0 15px rgba(217,119,111,.7),
-                 0 0 30px rgba(217,119,111,.5);
-  }
 }
 .PortfolioTotal{
   display:flex; 
@@ -308,19 +189,13 @@ body::before {
 }
 .PortfolioTotal-label{ 
   color:var(--text-muted); 
-  margin-left: 24px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   font-size: 12px;
 }
 .PortfolioTotal-value{ 
   color:var(--accent); 
-  font-size:18px; 
-  font-weight:800;
-  text-shadow: 0 0 15px rgba(107,157,209,.6),
-               0 2px 4px rgba(0,0,0,.3);
-  letter-spacing: 0.05em;
+  font-size:16px; 
+  font-weight:700;
 }
 
 .Controls{
@@ -429,354 +304,107 @@ body::before {
 }
 /* Start Button - Green */
 .btn-start{
-  background: linear-gradient(135deg, rgba(107,191,138,.5), rgba(107,191,138,.35));
-  border: 1px solid rgba(107,191,138,.6);
-  color: #ffffff;
+  background: var(--good);
+  border: 1px solid var(--good);
+  color: white;
   font-weight: 600;
-  font-size: 10px;
-  padding: 5px 10px;
-  box-shadow: 
-    0 3px 8px rgba(107,191,138,.3), 
-    inset 0 1px 0 rgba(255,255,255,.2),
-    0 0 15px rgba(107,191,138,.4);
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 60px;
-  max-width: 100%;
-  transition: all 0.2s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  text-shadow: 0 0 8px rgba(107,191,138,.8),
-               0 1px 3px rgba(0,0,0,.5);
-}
-.btn-start::before{
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent);
-  transition: left 0.5s ease;
-  z-index: 1;
-}
-.btn-start:hover::before{
-  left: 100%;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 .btn-start:hover{
-  background: linear-gradient(135deg, rgba(107,191,138,.6), rgba(107,191,138,.45));
-  border-color: rgba(107,191,138,.8);
-  box-shadow: 
-    0 6px 20px rgba(107,191,138,.4), 
-    inset 0 2px 0 rgba(255,255,255,.25),
-    0 0 30px rgba(107,191,138,.6);
-  transform: translateY(-2px) scale(1.05);
+  opacity: 0.9;
 }
-.btn-start:active{
-  transform: translateY(0px) scale(1);
-  box-shadow: 
-    0 2px 8px rgba(107,191,138,.3),
-    inset 0 1px 0 rgba(255,255,255,.15);
-}
-.btn-start > * {
-  position: relative;
-  z-index: 2;
+.btn-start:disabled{
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-/* Pause Button - Orange/Amber */
+/* Pause Button */
 .btn-pause{
-  background: linear-gradient(135deg, rgba(212,165,116,.5), rgba(212,165,116,.35));
-  border: 1px solid rgba(212,165,116,.6);
-  color: #ffffff;
+  background: var(--warm);
+  border: 1px solid var(--warm);
+  color: white;
   font-weight: 600;
-  font-size: 10px;
-  padding: 5px 10px;
-  box-shadow: 
-    0 3px 8px rgba(212,165,116,.3), 
-    inset 0 1px 0 rgba(255,255,255,.2),
-    0 0 15px rgba(212,165,116,.4);
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 60px;
-  max-width: 100%;
-  transition: all 0.2s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  text-shadow: 0 0 8px rgba(212,165,116,.8),
-               0 1px 3px rgba(0,0,0,.5);
-}
-.btn-pause::before{
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent);
-  transition: left 0.5s ease;
-  z-index: 1;
-}
-.btn-pause:hover::before{
-  left: 100%;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 .btn-pause:hover:not(:disabled){
-  background: linear-gradient(135deg, rgba(212,165,116,.6), rgba(212,165,116,.45));
-  border-color: rgba(212,165,116,.8);
-  box-shadow: 
-    0 6px 20px rgba(212,165,116,.4), 
-    inset 0 2px 0 rgba(255,255,255,.25),
-    0 0 30px rgba(212,165,116,.6);
-  transform: translateY(-2px) scale(1.05);
-}
-.btn-pause:active:not(:disabled){
-  transform: translateY(0px) scale(1);
-  box-shadow: 
-    0 2px 8px rgba(212,165,116,.3),
-    inset 0 1px 0 rgba(255,255,255,.15);
+  opacity: 0.9;
 }
 .btn-pause:disabled{
-  background: linear-gradient(135deg, rgba(100,100,100,.3), rgba(80,80,80,.2));
-  border-color: rgba(100,100,100,.4);
-  color: rgba(255,255,255,.5);
+  opacity: 0.5;
   cursor: not-allowed;
-  box-shadow: none;
-}
-.btn-pause > * {
-  position: relative;
-  z-index: 2;
 }
 
-/* Resume Button - Cyan/Blue */
+/* Resume Button */
 .btn-resume{
-  background: linear-gradient(135deg, rgba(107,157,209,.5), rgba(107,157,209,.35));
-  border: 1px solid rgba(107,157,209,.6);
-  color: #ffffff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: white;
   font-weight: 600;
-  font-size: 10px;
-  padding: 5px 10px;
-  box-shadow: 
-    0 3px 8px rgba(107,157,209,.3), 
-    inset 0 1px 0 rgba(255,255,255,.2),
-    0 0 15px rgba(107,157,209,.4);
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 60px;
-  max-width: 100%;
-  transition: all 0.2s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  text-shadow: 0 0 8px rgba(107,157,209,.8),
-               0 1px 3px rgba(0,0,0,.5);
-}
-.btn-resume::before{
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent);
-  transition: left 0.5s ease;
-  z-index: 1;
-}
-.btn-resume:hover::before{
-  left: 100%;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 .btn-resume:hover:not(:disabled){
-  background: linear-gradient(135deg, rgba(107,157,209,.6), rgba(107,157,209,.45));
-  border-color: rgba(107,157,209,.8);
-  box-shadow: 
-    0 6px 20px rgba(107,157,209,.4), 
-    inset 0 2px 0 rgba(255,255,255,.25),
-    0 0 30px rgba(107,157,209,.6);
-  transform: translateY(-2px) scale(1.05);
-}
-.btn-resume:active:not(:disabled){
-  transform: translateY(0px) scale(1);
-  box-shadow: 
-    0 2px 8px rgba(107,157,209,.3),
-    inset 0 1px 0 rgba(255,255,255,.15);
+  opacity: 0.9;
 }
 .btn-resume:disabled{
-  background: linear-gradient(135deg, rgba(100,100,100,.3), rgba(80,80,80,.2));
-  border-color: rgba(100,100,100,.4);
-  color: rgba(255,255,255,.5);
+  opacity: 0.5;
   cursor: not-allowed;
-  box-shadow: none;
-}
-.btn-resume > * {
-  position: relative;
-  z-index: 2;
 }
 
-/* Feedback Button - Pink/Purple Gradient */
+/* Feedback Button */
 .btn-feedback{
-  background: linear-gradient(135deg, rgba(157,139,184,.35), rgba(139,127,184,.3));
-  border: 1px solid rgba(157,139,184,.3);
-  color: #ffffff;
+  background: var(--accent2);
+  border: 1px solid var(--accent2);
+  color: white;
   font-weight: 600;
   font-size: 13px;
-  padding: 12px 16px;
-  box-shadow: 0 2px 12px rgba(157,139,184,.15), 
-              inset 0 1px 0 rgba(255,255,255,.08);
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  line-height: 1.4;
-  min-height: 44px;
-  z-index: 1;
-}
-.btn-feedback > * {
-  position: relative;
-  z-index: 2;
-}
-.btn-feedback::before{
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
   width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent);
-  transition: left 0.6s ease;
-  z-index: 1;
 }
-.btn-feedback:hover::before{
-  left: 100%;
+.btn-feedback:hover:not(:disabled){
+  opacity: 0.9;
 }
-.btn-feedback:hover{
-  background: linear-gradient(135deg, rgba(157,139,184,.45), rgba(139,127,184,.4));
-  border-color: rgba(157,139,184,.5);
-  box-shadow: 0 4px 16px rgba(157,139,184,.2), 
-              inset 0 1px 0 rgba(255,255,255,.12);
-  transform: translateY(-1px);
-}
-.btn-feedback:active{
-  transform: translateY(0px);
-  box-shadow: 0 2px 10px rgba(157,139,184,.2), 
-              inset 0 1px 0 rgba(255,255,255,.1),
-              0 0 0 1px rgba(157,139,184,.3);
+.btn-feedback:disabled{
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .Total{
   display:flex; justify-content:space-between; align-items:center;
   padding:12px 16px; font-weight:600; border-top:1px solid var(--border);
-  background: linear-gradient(90deg, rgba(107,157,209,.05), rgba(139,127,184,.03), transparent);
+  background: rgba(255,255,255,0.03);
   font-size:14px;
-  position: relative;
-  overflow: hidden;
-}
-.Total::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(107,157,209,.1), transparent);
-  animation: shimmer 3s infinite;
-}
-@keyframes shimmer {
-  0% { left: -100%; }
-  50% { left: 100%; }
-  100% { left: 100%; }
 }
 .ImpactBadge{
   position:absolute; bottom:8px; right:10px;
-  font-size:11px; opacity:.9; padding:6px 12px; border-radius:8px;
-  border:1px solid rgba(107,157,209,.3);
-  background: linear-gradient(135deg, rgba(107,157,209,.15), rgba(139,127,184,.1));
-  box-shadow: 0 2px 8px rgba(107,157,209,.2),
-              0 0 12px rgba(107,157,209,.15);
+  font-size:11px; opacity:.9; padding:6px 12px; border-radius:6px;
+  border:1px solid var(--border);
+  background: rgba(255,255,255,0.05);
   font-weight: 600;
-  animation: pulse-badge 2s ease-in-out infinite;
-}
-@keyframes pulse-badge {
-  0%, 100% {
-    box-shadow: 0 2px 8px rgba(107,157,209,.2),
-                0 0 12px rgba(107,157,209,.15);
-  }
-  50% {
-    box-shadow: 0 2px 12px rgba(107,157,209,.3),
-                0 0 20px rgba(107,157,209,.25);
-  }
 }
 
 .Timer{
   display:flex; 
   align-items:center; 
   justify-content:center;
-  height:70px; 
-  border-radius:12px; 
+  height:60px; 
+  border-radius:8px; 
   margin-top:8px;
-  border:3px solid rgba(107,157,209,.5);
-  background: linear-gradient(135deg, 
-    rgba(107,157,209,.2), 
-    rgba(139,127,184,.15),
-    rgba(107,157,209,.2)
-  );
-  font-weight:900; 
-  font-size:36px; 
-  letter-spacing:.1em;
-  box-shadow:
-    0 6px 24px rgba(107,157,209,.3),
-    0 0 40px rgba(107,157,209,.2),
-    inset 0 2px 0 rgba(255,255,255,.2),
-    inset 0 -2px 0 rgba(0,0,0,.3);
-  position: relative;
-  overflow: hidden;
-  text-shadow: 
-    0 0 20px rgba(107,157,209,.8),
-    0 0 40px rgba(107,157,209,.5),
-    0 2px 4px rgba(0,0,0,.5);
-  color: #ffffff;
-}
-.Timer::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(107,157,209,.3) 0%, transparent 70%);
-  animation: rotate-glow 3s linear infinite;
-}
-.Timer::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(45deg, 
-    transparent 30%, 
-    rgba(255,255,255,.1) 50%, 
-    transparent 70%
-  );
-  animation: timer-shine 2s ease-in-out infinite;
-}
-@keyframes rotate-glow {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-@keyframes timer-shine {
-  0%, 100% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
-  50% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+  border:1px solid var(--border);
+  background: var(--panel);
+  font-weight:700; 
+  font-size:28px; 
+  color: var(--text);
 }
 .Timer > * {
   position: relative;

@@ -48,14 +48,14 @@ export default function BlackSwanModal({ event, open, onChoose }) {
       <div 
         className="BlackSwanModalCard" 
         style={{
-          background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
-          color: "white",
-          padding: "20px",
+          background: "#ffffff",
+          color: "#1a1f2e",
+          padding: "24px",
           borderRadius: "12px",
           width: "100%",
           maxWidth: "380px",
-          boxShadow: "0 20px 60px rgba(216, 27, 96, 0.5)",
-          border: "2px solid rgba(216, 27, 96, 0.3)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
+          border: "1px solid rgba(0, 0, 0, 0.1)",
           animation: "slideUp 0.3s ease-out",
           position: "relative",
           margin: "0 auto",
@@ -72,7 +72,7 @@ export default function BlackSwanModal({ event, open, onChoose }) {
           top: "-15px",
           left: "50%",
           transform: "translateX(-50%)",
-          background: "#d81b60",
+          background: "#ff6b35",
           width: "50px",
           height: "50px",
           borderRadius: "50%",
@@ -80,28 +80,28 @@ export default function BlackSwanModal({ event, open, onChoose }) {
           alignItems: "center",
           justifyContent: "center",
           fontSize: "24px",
-          boxShadow: "0 4px 20px rgba(216, 27, 96, 0.6)"
+          boxShadow: "0 4px 12px rgba(255, 107, 53, 0.4)"
         }}>
           ⚠️
         </div>
 
         {/* Title */}
         <div style={{ 
-          fontSize: "18px", 
+          fontSize: "20px", 
           fontWeight: 700, 
-          marginBottom: "8px",
+          marginBottom: "12px",
           marginTop: "15px",
           textAlign: "center",
-          color: "#ff6b9d"
+          color: "#ff6b35"
         }}>
           {event.icon} {event.title}
         </div>
 
         {/* Description */}
         <p style={{ 
-          opacity: 0.9, 
-          marginBottom: "16px",
-          lineHeight: "1.5",
+          color: "#4a5568",
+          marginBottom: "20px",
+          lineHeight: "1.6",
           fontSize: "14px",
           textAlign: "center"
         }}>
@@ -110,17 +110,17 @@ export default function BlackSwanModal({ event, open, onChoose }) {
 
         {/* Impact warning */}
         <div style={{
-          background: "rgba(216, 27, 96, 0.2)",
-          padding: "10px",
-          borderRadius: "6px",
-          marginBottom: "16px",
-          border: "1px solid rgba(216, 27, 96, 0.4)",
+          background: "#fff4e6",
+          padding: "16px",
+          borderRadius: "8px",
+          marginBottom: "20px",
+          border: "2px solid #ff6b35",
           textAlign: "center"
         }}>
-          <div style={{ fontSize: "12px", opacity: 0.8, marginBottom: "4px" }}>
+          <div style={{ fontSize: "12px", color: "#666", marginBottom: "6px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
             Expected Impact
           </div>
-          <div style={{ fontSize: "18px", fontWeight: 700, color: "#ff6b9d" }}>
+          <div style={{ fontSize: "24px", fontWeight: 700, color: "#ff6b35" }}>
             {(event.impactPct * 100).toFixed(2)}%
           </div>
         </div>
@@ -134,23 +134,23 @@ export default function BlackSwanModal({ event, open, onChoose }) {
           <button 
             style={{
               flex: 1,
-              padding: "10px 12px",
-              border: "2px solid #4caf50",
-              borderRadius: "6px",
+              padding: "12px 16px",
+              border: "2px solid #6bbf8a",
+              borderRadius: "8px",
               fontSize: "14px",
               fontWeight: 600,
               cursor: "pointer",
-              background: "rgba(76, 175, 80, 0.1)",
-              color: "#4caf50",
+              background: "#ffffff",
+              color: "#6bbf8a",
               transition: "all 0.2s"
             }}
             onMouseEnter={(e) => {
-              e.target.style.background = "#4caf50";
+              e.target.style.background = "#6bbf8a";
               e.target.style.color = "white";
             }}
             onMouseLeave={(e) => {
-              e.target.style.background = "rgba(76, 175, 80, 0.1)";
-              e.target.style.color = "#4caf50";
+              e.target.style.background = "#ffffff";
+              e.target.style.color = "#6bbf8a";
             }}
             onClick={() => onChoose("HEDGE")}
           >
@@ -159,23 +159,23 @@ export default function BlackSwanModal({ event, open, onChoose }) {
           <button 
             style={{
               flex: 1,
-              padding: "10px 12px",
-              border: "2px solid #ff9800",
-              borderRadius: "6px",
+              padding: "12px 16px",
+              border: "2px solid #d4a574",
+              borderRadius: "8px",
               fontSize: "14px",
               fontWeight: 600,
               cursor: "pointer",
-              background: "rgba(255, 152, 0, 0.1)",
-              color: "#ff9800",
+              background: "#ffffff",
+              color: "#d4a574",
               transition: "all 0.2s"
             }}
             onMouseEnter={(e) => {
-              e.target.style.background = "#ff9800";
+              e.target.style.background = "#d4a574";
               e.target.style.color = "white";
             }}
             onMouseLeave={(e) => {
-              e.target.style.background = "rgba(255, 152, 0, 0.1)";
-              e.target.style.color = "#ff9800";
+              e.target.style.background = "#ffffff";
+              e.target.style.color = "#d4a574";
             }}
             onClick={() => onChoose("HOLD")}
           >
@@ -184,23 +184,23 @@ export default function BlackSwanModal({ event, open, onChoose }) {
           <button 
             style={{
               flex: 1,
-              padding: "10px 12px",
-              border: "2px solid #d81b60",
-              borderRadius: "6px",
+              padding: "12px 16px",
+              border: "2px solid #ff6b35",
+              borderRadius: "8px",
               fontSize: "14px",
               fontWeight: 600,
               cursor: "pointer",
-              background: "rgba(216, 27, 96, 0.2)",
-              color: "#ff6b9d",
+              background: "#ffffff",
+              color: "#ff6b35",
               transition: "all 0.2s"
             }}
             onMouseEnter={(e) => {
-              e.target.style.background = "#d81b60";
+              e.target.style.background = "#ff6b35";
               e.target.style.color = "white";
             }}
             onMouseLeave={(e) => {
-              e.target.style.background = "rgba(216, 27, 96, 0.2)";
-              e.target.style.color = "#ff6b9d";
+              e.target.style.background = "#ffffff";
+              e.target.style.color = "#ff6b35";
             }}
             onClick={() => onChoose("DOUBLE")}
           >
