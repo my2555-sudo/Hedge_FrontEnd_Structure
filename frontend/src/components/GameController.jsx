@@ -101,6 +101,7 @@ export default function GameController({
     }
     if (!controlledActive && gameEndedRef.current) {
       sessionStartedRef.current = false;
+      blackSwanForcedRef.current = false; // Reset black swan flag when game ends
     }
   }, [controlledActive, isControlled, startSession]);
 
@@ -207,27 +208,38 @@ export default function GameController({
       return;
     }
 
+    console.log("[BlackSwan] Setting up forced black swan timer - will trigger in 60 seconds");
+    
     // Set flag immediately to prevent multiple timers
     blackSwanForcedRef.current = true;
     
     // Wait 60 seconds, then trigger black swan
     const timer = setTimeout(() => {
+      console.log("[BlackSwan] Timer fired! isActive:", isActive, "isPaused:", isPaused);
       // Check again that game is still active and not paused
       if (isActive && !isPaused) {
+        console.log("[BlackSwan] Generating forced black swan event...");
         generateEvent({ forceBlackSwan: true })
           .then((result) => {
+            console.log("[BlackSwan] Result:", result);
             if (result.success && result.event) {
+              console.log("[BlackSwan] Success! Setting black swan:", result.event);
               setBlackSwan(result.event);
               handleEvent(result.event);
+            } else {
+              console.warn("[BlackSwan] Event generation failed:", result);
             }
           })
           .catch((error) => {
-            console.error("Error generating forced black swan:", error);
+            console.error("[BlackSwan] Error generating forced black swan:", error);
           });
+      } else {
+        console.warn("[BlackSwan] Game not active or paused, skipping black swan");
       }
     }, 60000); // 60 seconds = 1 minute
 
     return () => {
+      console.log("[BlackSwan] Cleaning up timer");
       clearTimeout(timer);
     };
   }, [isActive, isPaused, handleEvent]);
