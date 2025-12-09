@@ -166,7 +166,6 @@ export default function GameController({
         portfolioValue: newPortfolio,
       };
 
-<<<<<<< HEAD
       return updated;
     });
 
@@ -184,27 +183,6 @@ export default function GameController({
       setTimeout(() => setEventMessage(null), 3000);
     }
   }, [addEvent, processEventQueue]);
-=======
-      // Only publish non-blackswan events to the news feed
-      // Black swan events appear as modal popup only
-      if (event.type !== "BLACKSWAN") {
-        // Pass the difficulty-adjusted impact to the rest of the app
-        addEvent({ ...event, impactPct: effectiveImpact, ts: Date.now() });
-      }
-
-      // Only show toast for non-blackswan events (black swan has modal)
-      if (event.type !== "BLACKSWAN") {
-        setEventMessage({
-          text: `${event.title} (${impactAbs >= 0 ? "+" : ""}${impactAbs})`,
-          type: event.type,
-        });
-        setTimeout(() => setEventMessage(null), 3000);
-      }
-
-      return updated;
-    });
-  }, [addEvent, difficulty]);
->>>>>>> 3d82061ea3634ee0c52e1f2bc6310f5a88f38d12
 
   // --- Normal (MACRO/MICRO) random event generation ---
   useEffect(() => {
