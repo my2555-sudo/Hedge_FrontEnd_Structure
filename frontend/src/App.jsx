@@ -68,6 +68,7 @@ function AppInner() {
   // Stats tracking
   const [pnlHistory, setPnlHistory] = useState([]); // [{timestamp, pnl}]
   const [streak, setStreak] = useState(0); // Survival streak
+  const [difficulty, setDifficulty] = useState(1); // Game difficulty level (rounds)
   const lastGamePnLRef = useRef(0);
 
   // ensure we only apply each event once to portfolio
@@ -298,6 +299,9 @@ function AppInner() {
     const survived = totalPnL >= lastGamePnLRef.current || totalPnL >= 0;
     setStreak((prev) => (survived ? prev + 1 : 0));
 
+    // Increase difficulty level when player survives; reset to 1 on failure
+    setDifficulty((prev) => (survived ? prev + 1 : 1));
+
     const gameIdToSave = currentGameIdRef.current || currentGameId;
     const participantIdToSave = currentParticipantIdRef.current || currentParticipantId;
 
@@ -423,7 +427,11 @@ function AppInner() {
         )}
 
         {/* Drive GameController's active state from here so BlackSwan hook runs */}
-        <GameController controlledActive={gameActive && !gameOver} onGameEnd={handleGameEnd} />
+        <GameController
+          controlledActive={gameActive && !gameOver}
+          onGameEnd={handleGameEnd}
+          difficulty={difficulty}
+        />
         
         {/* Game Over Message */}
         {gameOver && (
@@ -439,31 +447,50 @@ function AppInner() {
           </div>
         )}
 
+        {/* Game controls + difficulty indicator */}
         <div style={{ 
           marginTop: 16, 
           display: "flex", 
+          flexDirection: "column",
           gap: "8px", 
           justifyContent: "center",
           padding: "10px",
           background: "rgba(0,0,0,.2)",
           borderRadius: "12px",
           border: "2px solid rgba(107,157,209,.2)",
-          boxShadow: "0 4px 16px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05)",
-          flexWrap: "wrap"
+          boxShadow: "0 4px 16px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05)"
         }}>
-          <button className="btn btn-start" onClick={startGame}>
-            {gameOver ? "🔄 New Game" : "▶ Start"}
-          </button>
-          <button className="btn btn-pause" onClick={pauseGame} disabled={!gameActive}>
-            ⏸ Pause
-          </button>
-          <button
-            className="btn btn-resume"
-            onClick={resumeGame}
-            disabled={gameActive || gameOver}
-          >
-            ▶ Resume
-          </button>
+          <div style={{ 
+            fontSize: "12px", 
+            opacity: 0.85, 
+            textAlign: "center",
+            marginBottom: 4 
+          }}>
+            Difficulty Level:{" "}
+            <span style={{ fontWeight: 700, color: "var(--accent)" }}>
+              Level {difficulty}
+            </span>
+          </div>
+          <div style={{ 
+            display: "flex", 
+            gap: "8px", 
+            justifyContent: "center",
+            flexWrap: "wrap"
+          }}>
+            <button className="btn btn-start" onClick={startGame}>
+              {gameOver ? "🔄 New Game" : "▶ Start"}
+            </button>
+            <button className="btn btn-pause" onClick={pauseGame} disabled={!gameActive}>
+              ⏸ Pause
+            </button>
+            <button
+              className="btn btn-resume"
+              onClick={resumeGame}
+              disabled={gameActive || gameOver}
+            >
+              ▶ Resume
+            </button>
+          </div>
         </div>
 
         <AICoachPanel 

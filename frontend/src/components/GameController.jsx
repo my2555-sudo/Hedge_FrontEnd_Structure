@@ -7,10 +7,29 @@ import { useBlackSwan } from "./useBlackSwan";
 import BlackSwanModal from "./BlackSwanModal.jsx";
 
 // ---- News cadence knobs ----
-// More aggressive cadence now that rounds are removed
-const NEWS_MIN_MS = 2000;                // ~2 seconds minimum between events
-const NEWS_MAX_MS = 4000;                // ~4 seconds maximum between events
+// News emission probability per tick
 const NEWS_FIRE_PROB = 1.0;               // always fire when scheduled
+
+// Map difficulty level → news cadence (in milliseconds)
+// Roughly:
+//  - Level 1: ~5s 一条
+//  - Level 2: ~3s 一条
+//  - Level 3: ~2s 一条
+//  - Level 4+: ~1.5s 一条
+function getNewsCadenceMs(difficulty) {
+  const level = Math.max(1, difficulty || 1);
+  if (level <= 1) {
+    return { min: 4500, max: 5500 }; // ~5 seconds
+  }
+  if (level === 2) {
+    return { min: 2500, max: 3500 }; // ~3 seconds
+  }
+  if (level === 3) {
+    return { min: 1800, max: 2600 }; // ~2 seconds
+  }
+  // Level 4+ — clamp to a fast but reasonable range
+  return { min: 1200, max: 2000 };       // ~1.5 seconds
+}
 
 const INITIAL_PORTFOLIO = 20000;
 
@@ -22,6 +41,7 @@ export default function GameController({
   emitEvents = true,
   controlledActive,           // allow parent to control active state
   onGameEnd,                  // optional callback when the full game ends
+  difficulty = 1,             // gameplay difficulty level (1 = normal, >1 = harder)
 }) {
   const { addEvent } = useEventBus();
 
@@ -110,8 +130,11 @@ export default function GameController({
     setGameState((prev) => {
       if (!prev) return prev;
 
-      const rawImpact = event.impactPct || 0;
-      const impactAbs = Math.round(prev.portfolioValue * rawImpact);
+      const baseImpact = event.impactPct || 0;
+      // Difficulty multiplier: higher difficulty amplifies event impact
+      const difficultyMultiplier = 1 + 0.25 * Math.max(0, difficulty - 1);
+      const effectiveImpact = baseImpact * difficultyMultiplier;
+      const impactAbs = Math.round(prev.portfolioValue * effectiveImpact);
       const newPortfolio = Math.max(0, prev.portfolioValue + impactAbs);
 
       const updated = {
@@ -122,7 +145,8 @@ export default function GameController({
       // Only publish non-blackswan events to the news feed
       // Black swan events appear as modal popup only
       if (event.type !== "BLACKSWAN") {
-        addEvent({ ...event, ts: Date.now() });
+        // Pass the difficulty-adjusted impact to the rest of the app
+        addEvent({ ...event, impactPct: effectiveImpact, ts: Date.now() });
       }
 
       // Only show toast for non-blackswan events (black swan has modal)
@@ -136,7 +160,7 @@ export default function GameController({
 
       return updated;
     });
-  }, [addEvent]);
+  }, [addEvent, difficulty]);
 
   // --- Normal (MACRO/MICRO) random event generation ---
   useEffect(() => {
@@ -145,6 +169,9 @@ export default function GameController({
     loopRef.current.running = true;
 
     let cancelled = false;
+
+    // Compute cadence based on current difficulty level
+    const { min: levelMinMs, max: levelMaxMs } = getNewsCadenceMs(difficulty);
 
     async function fetchEventFromAPI() {
       try {
@@ -172,7 +199,8 @@ export default function GameController({
           console.warn("Error fetching event:", error);
         }
       }
-      const nextTimeout = NEWS_MIN_MS + Math.random() * (NEWS_MAX_MS - NEWS_MIN_MS); 
+      const nextTimeout =
+        levelMinMs + Math.random() * (levelMaxMs - levelMinMs);
       loopRef.current.timeoutId = setTimeout(scheduleEvent, nextTimeout);
     };
 
@@ -185,7 +213,7 @@ export default function GameController({
       loopRef.current.running = false;
       loopRef.current.timeoutId = null;
     };
-  }, [isActive, isPaused, emitEvents, handleEvent]);
+  }, [isActive, isPaused, emitEvents, handleEvent, difficulty]);
 
   // --- Black Swan emitter (rare, Poisson-timed) ---
   // Only active when game is active AND not paused
