@@ -624,3 +624,49 @@ body{
   background: rgba(107,157,209,.3);
 }
 
+/* Modal scrollbar styling */
+.ModalCard::-webkit-scrollbar {
+  width: 8px;
+}
+.ModalCard::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+}
+.ModalCard::-webkit-scrollbar-thumb {
+  background: rgba(107,157,209,0.4);
+  border-radius: 4px;
+}
+.ModalCard::-webkit-scrollbar-thumb:hover {
+  background: rgba(107,157,209,0.6);
+}
+
+/* Modal animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+

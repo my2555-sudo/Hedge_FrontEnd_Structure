@@ -31,9 +31,11 @@ function AppInner() {
 
   // --- game state (top-level UI timer only) ---
   // All hooks must be called before any early returns (React Hooks rules)
-  const GAME_DURATION = 300; // 5 minutes
+  const ROUND_SECONDS = 30; // 30 seconds per round
+  const GAME_DURATION = 300; // 10 rounds * 30 seconds = 5 minutes
   const [gameActive, setGameActive] = useState(false);
   const [gameOver, setGameOver] = useState(false);
+  const [roundNumber, setRoundNumber] = useState(1);
 
   // global event bus
   const { events } = useEventBus();
@@ -69,6 +71,12 @@ function AppInner() {
   const [pnlHistory, setPnlHistory] = useState([]); // [{timestamp, pnl}]
   const [streak, setStreak] = useState(0); // Survival streak
   const lastGamePnLRef = useRef(0);
+  
+  // Round tracking for AI Coach
+  const [roundData, setRoundData] = useState(null); // { roundNumber, tradesThisRound, eventsThisRound, roundPnL, roundStartPnL }
+  const roundStartPnLRef = useRef(0);
+  const roundTradesRef = useRef(0);
+  const roundEventsRef = useRef(0);
 
   // ensure we only apply each event once to portfolio
   const lastAppliedIdRef = useRef(null);
@@ -76,6 +84,16 @@ function AppInner() {
   // Ref to store current game ID (persists even if state is cleared)
   const currentGameIdRef = useRef(null);
   const currentParticipantIdRef = useRef(null);
+
+  // Total P/L (must be defined before useEffects that use it)
+  const totalPnL = useMemo(
+    () =>
+      portfolio.reduce(
+        (sum, r) => sum + (r.price - r.avgPrice) * r.shares,
+        0
+      ),
+    [portfolio]
+  );
 
   // === Initialize Tickers (on app startup) ===
   useEffect(() => {
@@ -156,6 +174,36 @@ function AppInner() {
     lastEventIdRef.current = ev.runtimeId;
   }, [events, gameActive]);
 
+  // Track round data for AI Coach (only for game-end feedback)
+  useEffect(() => {
+    if (gameActive && roundNumber === 1) {
+      // Reset round tracking when starting a new game
+      roundStartPnLRef.current = totalPnL;
+      roundTradesRef.current = 0;
+      roundEventsRef.current = 0;
+    }
+  }, [gameActive, roundNumber, totalPnL]);
+
+  // Track trades per round
+  useEffect(() => {
+    if (gameActive) {
+      roundTradesRef.current = recentTrades.filter(
+        t => t.timestamp >= (Date.now() - (ROUND_SECONDS * 1000))
+      ).length;
+    }
+  }, [recentTrades, gameActive]);
+
+  // Track events per round
+  useEffect(() => {
+    if (gameActive && lastEvent) {
+      roundEventsRef.current = events.filter(
+        e => e.ts >= (Date.now() - (ROUND_SECONDS * 1000))
+      ).length;
+    }
+  }, [events, lastEvent, gameActive]);
+
+  // No round-end feedback - only game-end feedback
+
   // Trade (with cash validation)
   function handleTrade({ ticker, action, qty }) {
     const row = portfolio.find((r) => r.ticker === ticker);
@@ -207,16 +255,6 @@ function AppInner() {
     setFlashTicker(ticker);
     setTimeout(() => setFlashTicker(null), 400);
   }
-
-  // Total P/L
-  const totalPnL = useMemo(
-    () =>
-      portfolio.reduce(
-        (sum, r) => sum + (r.price - r.avgPrice) * r.shares,
-        0
-      ),
-    [portfolio]
-  );
 
   // Track P/L history for dashboard
   useEffect(() => {
@@ -280,6 +318,7 @@ function AppInner() {
       // Reset game completely if starting after game over
       setGameOver(false);
       setGameActive(false);
+      setRoundNumber(1);
       return;
     }
     setLastEvent(null);
@@ -287,6 +326,10 @@ function AppInner() {
     lastAppliedIdRef.current = null;
     setGameActive(true);
     lastGamePnLRef.current = totalPnL;
+    // Reset round number when starting new game
+    if (roundNumber === 1 && !gameActive) {
+      setRoundNumber(1);
+    }
   }
   
   // Handle game end (called from GameController)
@@ -312,6 +355,98 @@ function AppInner() {
         return currentPortfolio;
       });
     }
+    
+    // Prepare game-end feedback data with comprehensive news analysis
+    const gameStartTime = Date.now() - (GAME_DURATION * 1000);
+    const allGameEvents = events.filter(e => e.ts >= gameStartTime);
+    const allGameTrades = recentTrades.filter(t => t.timestamp >= gameStartTime);
+    
+    // Build detailed trade history with event associations
+    const tradeHistory = allGameTrades.map(trade => {
+      // Find the event this trade reacted to (if any)
+      const relatedEvent = allGameEvents.find(e => 
+        trade.timestamp >= e.ts && trade.timestamp <= e.ts + 15000
+      );
+      
+      return {
+        action: trade.action,
+        ticker: trade.ticker,
+        quantity: trade.qty,
+        price: trade.price,
+        timestamp: trade.timestamp,
+        timeAfterStart: trade.timestamp - gameStartTime,
+        relatedEvent: relatedEvent ? {
+          type: relatedEvent.type,
+          title: relatedEvent.title,
+          impactPct: relatedEvent.impactPct,
+          eventTime: relatedEvent.ts
+        } : null,
+        reactionTime: relatedEvent ? trade.timestamp - relatedEvent.ts : null
+      };
+    });
+    
+    // Analyze overall news comprehension across entire game
+    const overallEventReactions = allGameEvents.map(event => {
+      const reactionTrades = allGameTrades.filter(
+        t => t.timestamp >= event.ts && t.timestamp <= event.ts + 15000
+      );
+      const reactionTime = reactionTrades.length > 0 
+        ? reactionTrades[0].timestamp - event.ts 
+        : null;
+      
+      return {
+        event: {
+          type: event.type,
+          title: event.title,
+          impactPct: event.impactPct,
+          timestamp: event.ts
+        },
+        reacted: reactionTrades.length > 0,
+        reactionTimeMs: reactionTime,
+        trades: reactionTrades.map(t => ({
+          action: t.action,
+          ticker: t.ticker,
+          qty: t.qty,
+          price: t.price,
+          timeAfterEvent: t.timestamp - event.ts
+        })),
+        correctReaction: event.impactPct > 0 
+          ? reactionTrades.some(t => t.action === "BUY")
+          : event.impactPct < 0
+          ? reactionTrades.some(t => t.action === "SELL")
+          : null
+      };
+    });
+    
+    const correctReactions = overallEventReactions.filter(r => r.reacted && r.correctReaction === true).length;
+    const totalReactions = overallEventReactions.filter(r => r.reacted).length;
+    const newsComprehensionScore = totalReactions > 0 ? (correctReactions / totalReactions) : 0;
+    
+    const gameEndData = {
+      isGameEnd: true,
+      totalRounds: roundNumber,
+      finalPnL: totalPnL,
+      totalEvents: allGameEvents.length,
+      totalTrades: allGameTrades.length,
+      eventReactions: overallEventReactions,
+      tradeHistory: tradeHistory, // Detailed trade history with event associations
+      eventsInRound: allGameEvents.map(e => ({
+        type: e.type,
+        title: e.title,
+        impactPct: e.impactPct,
+        timestamp: e.ts
+      })),
+      newsComprehensionScore: newsComprehensionScore,
+      correctReactions: correctReactions,
+      totalReactions: totalReactions
+    };
+    
+    setRoundData(gameEndData);
+    
+    // Automatically open feedback modal at game end
+    setTimeout(() => {
+      setFeedbackModalOpen(true);
+    }, 1500);
   }
 
   function pauseGame() {
@@ -322,7 +457,10 @@ function AppInner() {
   }
 
   // Show login page if not authenticated (after all hooks)
+  console.log('App render - loading:', loading, 'user:', user ? 'exists' : 'null')
+  
   if (loading) {
+    console.log('Showing loading screen...')
     return (
       <div style={{ 
         display: 'flex', 
@@ -332,14 +470,20 @@ function AppInner() {
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         color: 'white'
       }}>
-        <div>Loading...</div>
+        <div>
+          <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳ Loading...</div>
+          <div style={{ fontSize: '14px', opacity: 0.7 }}>Checking authentication...</div>
+        </div>
       </div>
     );
   }
 
   if (!user) {
+    console.log('No user, showing login page...')
     return <LoginPage />;
   }
+
+  console.log('User authenticated, showing main app...')
 
   return (
     <div className="AppRoot">
@@ -412,7 +556,10 @@ function AppInner() {
         )}
 
         {/* Drive GameController's active state from here so BlackSwan hook runs */}
-        <GameController controlledActive={gameActive && !gameOver} onGameEnd={handleGameEnd} />
+        <GameController 
+          controlledActive={gameActive && !gameOver} 
+          onGameEnd={handleGameEnd} 
+        />
         
         {/* Game Over Message */}
         {gameOver && (
@@ -458,10 +605,97 @@ function AppInner() {
         {lastEvent && (
           <button 
             className="btn btn-feedback" 
-            onClick={() => setFeedbackModalOpen(true)}
-            style={{ marginTop: 8, width: "100%" }}
+            onClick={() => {
+              // If game ended but roundData was cleared, recreate it
+              if (gameOver && !roundData) {
+                const gameStartTime = Date.now() - (GAME_DURATION * 1000);
+                const allGameEvents = events.filter(e => e.ts >= gameStartTime);
+                const allGameTrades = recentTrades.filter(t => t.timestamp >= gameStartTime);
+                
+                const overallEventReactions = allGameEvents.map(event => {
+                  const reactionTrades = allGameTrades.filter(
+                    t => t.timestamp >= event.ts && t.timestamp <= event.ts + 15000
+                  );
+                  return {
+                    event: {
+                      type: event.type,
+                      title: event.title,
+                      impactPct: event.impactPct,
+                      timestamp: event.ts
+                    },
+                    reacted: reactionTrades.length > 0,
+                    reactionTimeMs: reactionTrades.length > 0 ? reactionTrades[0].timestamp - event.ts : null,
+                    trades: reactionTrades.map(t => ({
+                      action: t.action,
+                      ticker: t.ticker,
+                      qty: t.qty,
+                      price: t.price,
+                      timeAfterEvent: t.timestamp - event.ts
+                    })),
+                    correctReaction: event.impactPct > 0 
+                      ? reactionTrades.some(t => t.action === "BUY")
+                      : event.impactPct < 0
+                      ? reactionTrades.some(t => t.action === "SELL")
+                      : null
+                  };
+                });
+                
+                const tradeHistory = allGameTrades.map(trade => {
+                  const relatedEvent = allGameEvents.find(e => 
+                    trade.timestamp >= e.ts && trade.timestamp <= e.ts + 15000
+                  );
+                  return {
+                    action: trade.action,
+                    ticker: trade.ticker,
+                    quantity: trade.qty,
+                    price: trade.price,
+                    timestamp: trade.timestamp,
+                    relatedEvent: relatedEvent ? {
+                      type: relatedEvent.type,
+                      title: relatedEvent.title,
+                      impactPct: relatedEvent.impactPct,
+                      eventTime: relatedEvent.ts
+                    } : null,
+                    reactionTime: relatedEvent ? trade.timestamp - relatedEvent.ts : null
+                  };
+                });
+                
+                const correctReactions = overallEventReactions.filter(r => r.reacted && r.correctReaction === true).length;
+                const totalReactions = overallEventReactions.filter(r => r.reacted).length;
+                const newsComprehensionScore = totalReactions > 0 ? (correctReactions / totalReactions) : 0;
+                
+                setRoundData({
+                  isGameEnd: true,
+                  totalRounds: roundNumber,
+                  finalPnL: totalPnL,
+                  totalEvents: allGameEvents.length,
+                  totalTrades: allGameTrades.length,
+                  eventReactions: overallEventReactions,
+                  tradeHistory: tradeHistory,
+                  eventsInRound: allGameEvents.map(e => ({
+                    type: e.type,
+                    title: e.title,
+                    impactPct: e.impactPct,
+                    timestamp: e.ts
+                  })),
+                  newsComprehensionScore: newsComprehensionScore,
+                  correctReactions: correctReactions,
+                  totalReactions: totalReactions
+                });
+              }
+              setFeedbackModalOpen(true);
+            }}
+            disabled={gameActive && !gameOver}
+            style={{ 
+              marginTop: 8, 
+              width: "100%",
+              opacity: (gameActive && !gameOver) ? 0.5 : 1,
+              cursor: (gameActive && !gameOver) ? "not-allowed" : "pointer"
+            }}
+            title={gameActive && !gameOver ? "Feedback available only after game ends" : "Get AI Coach feedback"}
           >
             💡 Get Feedback ({feedbackMode === "serious" ? "📊" : "🎮"})
+            {gameActive && !gameOver && " (After game ends)"}
           </button>
         )}
         
@@ -590,7 +824,12 @@ function AppInner() {
         totalPnL={totalPnL}
         recentTrades={recentTrades}
         mode={feedbackMode}
-        onClose={() => setFeedbackModalOpen(false)}
+        roundData={roundData}
+        gameActive={gameActive}
+        onClose={() => {
+          setFeedbackModalOpen(false);
+          setRoundData(null); // Clear round data when closing
+        }}
       />
     </div>
   );

@@ -35,20 +35,42 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
+    console.log('AuthContext: Initializing auth check...')
+    
+    // Set a timeout to prevent infinite loading (5 seconds)
+    const timeoutId = setTimeout(() => {
+      console.warn('AuthContext: Timeout waiting for auth, setting loading to false')
+      setLoading(false)
+    }, 5000)
+
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        ensureProfileExists(session.user).finally(() => fetchProfile(session.user.id))
-      } else {
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        clearTimeout(timeoutId)
+        if (error) {
+          console.error('AuthContext: Error getting session:', error)
+          setLoading(false)
+          return
+        }
+        console.log('AuthContext: Session check complete, user:', session?.user ? 'exists' : 'null')
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          ensureProfileExists(session.user).finally(() => fetchProfile(session.user.id))
+        } else {
+          setLoading(false)
+        }
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId)
+        console.error('AuthContext: Exception getting session:', error)
         setLoading(false)
-      }
-    })
+      })
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('AuthContext: Auth state changed, user:', session?.user ? 'exists' : 'null')
       setUser(session?.user ?? null)
       if (session?.user) {
         ensureProfileExists(session.user).finally(() => fetchProfile(session.user.id))
@@ -58,7 +80,10 @@ export function AuthProvider({ children }) {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      clearTimeout(timeoutId)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const fetchProfile = async (userId) => {

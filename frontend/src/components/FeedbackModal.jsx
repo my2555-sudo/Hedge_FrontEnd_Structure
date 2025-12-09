@@ -21,11 +21,17 @@ export default function FeedbackModal({
   totalPnL = 0,
   recentTrades = [],
   mode = "serious",
+  roundData = null,
+  gameActive = false,
   onClose 
 }) {
   const [aiTips, setAiTips] = useState([]);
   const [aiStatus, setAiStatus] = useState("idle"); // idle | loading | success | error | disabled
   const [aiError, setAiError] = useState(null);
+  const [investmentStyle, setInvestmentStyle] = useState(null);
+  const [styleDescription, setStyleDescription] = useState(null);
+  const [strengths, setStrengths] = useState([]);
+  const [improvements, setImprovements] = useState([]);
   const abortRef = useRef();
 
   // Determine player action based on recent trades
@@ -68,13 +74,17 @@ export default function FeedbackModal({
     });
   }, [lastEvent, playerAction, portfolio, totalPnL, mode]);
 
-  const coachApiKey = import.meta.env.VITE_HF_API_KEY?.trim();
+  const coachApiKey = import.meta.env.VITE_OPENROUTER_API_KEY?.trim();
 
   useEffect(() => {
     if (!open) {
       setAiStatus("idle");
       setAiTips([]);
       setAiError(null);
+      setInvestmentStyle(null);
+      setStyleDescription(null);
+      setStrengths([]);
+      setImprovements([]);
       if (abortRef.current) {
         abortRef.current.abort();
         abortRef.current = undefined;
@@ -83,11 +93,30 @@ export default function FeedbackModal({
     }
 
     if (!coachApiKey) {
+      console.warn("AI Coach: No API key found. Set VITE_OPENROUTER_API_KEY in .env file");
+      setAiStatus("disabled");
+      setAiTips([]);
+      setAiError(null);
+      setInvestmentStyle(null);
+      setStyleDescription(null);
+      setStrengths([]);
+      setImprovements([]);
+      return;
+    }
+    
+    // Only make API request if this is game-end feedback
+    // Allow API calls if: roundData has isGameEnd flag OR game is over (gameOver = true)
+    const isGameEndFeedback = roundData?.isGameEnd || (!gameActive && roundData !== null);
+    
+    if (!isGameEndFeedback) {
+      console.log("AI Coach: Skipping API request - only game-end feedback uses API");
       setAiStatus("disabled");
       setAiTips([]);
       setAiError(null);
       return;
     }
+    
+    console.log("AI Coach: API key found, making request for game-end feedback...");
 
     if (abortRef.current) {
       abortRef.current.abort();
@@ -101,18 +130,26 @@ export default function FeedbackModal({
             .slice(0, 5)
             .map(
               (holding) =>
-                `${holding.ticker}: ${holding.shares} @ $${holding.price.toFixed(
+                `${holding.ticker}: ${holding.shares} shares @ $${holding.price.toFixed(
                   2
-                )}`
+                )} (avg: $${holding.avgPrice?.toFixed(2) || holding.price.toFixed(2)})`
             )
             .join(", ")
         : "No active holdings";
 
-    const eventSummary = lastEvent
-      ? `${lastEvent.type} event "${lastEvent.title}" with base impact ${(lastEvent.impactPct * 100).toFixed(
-          2
-        )}%`
-      : "No recent event";
+    // Build comprehensive event summary including all events in round/game
+    let eventSummary = "";
+    if (roundData?.eventReactions && roundData.eventReactions.length > 0) {
+      const eventsList = roundData.eventReactions.map((r, idx) => {
+        const event = r.event || r;
+        return `${idx + 1}. ${event.type}: "${event.title}" (${(event.impactPct * 100).toFixed(1)}% impact)`;
+      }).join("\n");
+      eventSummary = `Events ${roundData.isGameEnd ? 'during game' : 'this round'}:\n${eventsList}`;
+    } else if (lastEvent) {
+      eventSummary = `${lastEvent.type} event "${lastEvent.title}" with impact ${(lastEvent.impactPct * 100).toFixed(2)}%`;
+    } else {
+      eventSummary = "No recent events";
+    }
 
     setAiStatus("loading");
     setAiError(null);
@@ -125,10 +162,15 @@ export default function FeedbackModal({
       mode,
       apiKey: coachApiKey,
       controller,
+      roundData, // Pass round data if available
     })
-      .then((tips) => {
+      .then((result) => {
         if (!controller.signal.aborted) {
-          setAiTips(tips);
+          setAiTips(result.tips || []);
+          setInvestmentStyle(result.investmentStyle);
+          setStyleDescription(result.styleDescription);
+          setStrengths(result.strengths || []);
+          setImprovements(result.improvements || []);
           setAiStatus("success");
         }
       })
@@ -142,7 +184,7 @@ export default function FeedbackModal({
     return () => {
       controller.abort();
     };
-  }, [open, lastEvent, portfolio, totalPnL, playerAction, mode, coachApiKey]);
+  }, [open, lastEvent, portfolio, totalPnL, playerAction, mode, coachApiKey, roundData]);
 
   if (!open) return null;
 
@@ -175,8 +217,20 @@ export default function FeedbackModal({
           borderRadius: "16px",
           width: "90%",
           maxWidth: "520px",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          overflowX: "hidden",
           boxShadow: "0 20px 60px rgba(0,0,0,0.8)",
-          border: "1px solid rgba(255,255,255,0.1)"
+          border: "1px solid rgba(255,255,255,0.1)",
+          display: "flex",
+          flexDirection: "column",
+          // Custom scrollbar styling
+          scrollbarWidth: "thin",
+          scrollbarColor: "rgba(107, 157, 209, 0.5) transparent"
+        }}
+        onScroll={(e) => {
+          // Smooth scroll behavior
+          e.currentTarget.style.scrollBehavior = "smooth";
         }}
       >
         {/* Header */}
@@ -302,7 +356,7 @@ export default function FeedbackModal({
               borderRadius: "8px",
               border: "1px dashed rgba(255,255,255,0.15)"
             }}>
-              Provide a Hugging Face API key in `VITE_HF_API_KEY` to enable live coaching tips. Showing rule-based suggestions above.
+              Provide an OpenRouter API key in `VITE_OPENROUTER_API_KEY` to enable live AI coaching tips. Showing rule-based suggestions above.
             </div>
           )}
           {coachApiKey && aiStatus === "loading" && (

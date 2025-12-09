@@ -102,13 +102,40 @@ export default function GameController({
     }
   }, [controlledActive, isControlled, startSession]);
 
+  // Queue for events to publish (to avoid React warning)
+  const eventQueueRef = useRef([]);
+  
+  // Process event queue function
+  const processEventQueue = useCallback(() => {
+    if (eventQueueRef.current.length > 0) {
+      const eventsToPublish = [...eventQueueRef.current];
+      eventQueueRef.current = [];
+      
+      // Use Promise.resolve().then() to defer to next tick (avoids React warning)
+      Promise.resolve().then(() => {
+        eventsToPublish.forEach(event => {
+          if (event.type !== "BLACKSWAN") {
+            addEvent({ ...event, ts: Date.now() });
+          }
+        });
+      });
+    }
+  }, [addEvent]);
+  
+  // Publish queued events after render
+  useEffect(() => {
+    processEventQueue();
+  });
+
   // --- Handle event impact & publish to feed ---
   const handleEvent = useCallback((event) => {
+    let impactAbs = 0;
+    
     setGameState((prev) => {
       if (!prev) return prev;
 
       const rawImpact = event.impactPct || 0;
-      const impactAbs = Math.round(prev.portfolioValue * rawImpact);
+      impactAbs = Math.round(prev.portfolioValue * rawImpact);
       const newPortfolio = Math.max(0, prev.portfolioValue + impactAbs);
 
       const updated = {
@@ -116,24 +143,23 @@ export default function GameController({
         portfolioValue: newPortfolio,
       };
 
-      // Only publish non-blackswan events to the news feed
-      // Black swan events appear as modal popup only
-      if (event.type !== "BLACKSWAN") {
-        addEvent({ ...event, ts: Date.now() });
-      }
-
-      // Only show toast for non-blackswan events (black swan has modal)
-      if (event.type !== "BLACKSWAN") {
-        setEventMessage({
-          text: `${event.title} (${impactAbs >= 0 ? "+" : ""}${impactAbs})`,
-          type: event.type,
-        });
-        setTimeout(() => setEventMessage(null), 3000);
-      }
-
       return updated;
     });
-  }, [addEvent]);
+
+    // Queue event for publishing after render (avoids React warning)
+    if (event.type !== "BLACKSWAN") {
+      eventQueueRef.current.push(event);
+      // Trigger processing
+      processEventQueue();
+      
+      // Only show toast for non-blackswan events (black swan has modal)
+      setEventMessage({
+        text: `${event.title} (${impactAbs >= 0 ? "+" : ""}${impactAbs})`,
+        type: event.type,
+      });
+      setTimeout(() => setEventMessage(null), 3000);
+    }
+  }, [addEvent, processEventQueue]);
 
   // --- Normal (MACRO/MICRO) random event generation ---
   useEffect(() => {
