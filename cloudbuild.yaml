@@ -9,6 +9,8 @@ steps:
       - 'gcr.io/$PROJECT_ID/hedge-frontend:latest'
       - '-f'
       - 'frontend/Dockerfile'
+      - '--build-arg'
+      - 'VITE_API_BASE_URL=https://hedgebackend-882843235490.northamerica-northeast2.run.app'
       - 'frontend'
 
   # Push the image to Container Registry
