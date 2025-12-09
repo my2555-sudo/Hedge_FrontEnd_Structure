@@ -46,7 +46,7 @@ export default function StatsDashboard({
   }, [portfolioValue, initialValue]);
 
   return (
-    <div className="glass" style={{ padding: "12px", marginTop: "8px" }}>
+    <div className="glass AnalyticsDashboard" style={{ padding: "12px", marginTop: "8px" }}>
       <div className="PanelTitle" style={{ marginBottom: "10px" }}>
         📊 ANALYTICS DASHBOARD
       </div>

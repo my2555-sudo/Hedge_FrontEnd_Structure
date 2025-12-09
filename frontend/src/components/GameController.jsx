@@ -7,10 +7,29 @@ import { useBlackSwan } from "./useBlackSwan";
 import BlackSwanModal from "./BlackSwanModal.jsx";
 
 // ---- News cadence knobs ----
-// More aggressive cadence now that rounds are removed
-const NEWS_MIN_MS = 2000;                // ~2 seconds minimum between events
-const NEWS_MAX_MS = 4000;                // ~4 seconds maximum between events
+// News emission probability per tick
 const NEWS_FIRE_PROB = 1.0;               // always fire when scheduled
+
+// Map difficulty level → news cadence (in milliseconds)
+// Roughly:
+//  - Level 1: ~5s 一条
+//  - Level 2: ~3s 一条
+//  - Level 3: ~2s 一条
+//  - Level 4+: ~1.5s 一条
+function getNewsCadenceMs(difficulty) {
+  const level = Math.max(1, difficulty || 1);
+  if (level <= 1) {
+    return { min: 4500, max: 5500 }; // ~5 seconds
+  }
+  if (level === 2) {
+    return { min: 2500, max: 3500 }; // ~3 seconds
+  }
+  if (level === 3) {
+    return { min: 1800, max: 2600 }; // ~2 seconds
+  }
+  // Level 4+ — clamp to a fast but reasonable range
+  return { min: 1200, max: 2000 };       // ~1.5 seconds
+}
 
 const INITIAL_PORTFOLIO = 20000;
 
@@ -22,6 +41,7 @@ export default function GameController({
   emitEvents = true,
   controlledActive,           // allow parent to control active state
   onGameEnd,                  // optional callback when the full game ends
+  difficulty = 1,             // gameplay difficulty level (1 = normal, >1 = harder)
 }) {
   const { addEvent } = useEventBus();
 
@@ -44,6 +64,7 @@ export default function GameController({
   const [blackSwan, setBlackSwan] = useState(null);
   const sessionStartedRef = useRef(false);
   const gameEndedRef = useRef(false);
+  const blackSwanForcedRef = useRef(false);
 
   // parent-controlled active flag (if provided)
   const isControlled = controlledActive !== undefined;
@@ -62,6 +83,7 @@ export default function GameController({
     setBlackSwan(null);
     sessionStartedRef.current = true;
     gameEndedRef.current = false;
+    blackSwanForcedRef.current = false; // Reset forced black swan flag
   }, [gameDuration, playerName]);
 
   const handleGameComplete = useCallback(() => {
@@ -99,6 +121,7 @@ export default function GameController({
     }
     if (!controlledActive && gameEndedRef.current) {
       sessionStartedRef.current = false;
+      blackSwanForcedRef.current = false; // Reset black swan flag when game ends
     }
   }, [controlledActive, isControlled, startSession]);
 
@@ -143,6 +166,7 @@ export default function GameController({
         portfolioValue: newPortfolio,
       };
 
+<<<<<<< HEAD
       return updated;
     });
 
@@ -160,6 +184,27 @@ export default function GameController({
       setTimeout(() => setEventMessage(null), 3000);
     }
   }, [addEvent, processEventQueue]);
+=======
+      // Only publish non-blackswan events to the news feed
+      // Black swan events appear as modal popup only
+      if (event.type !== "BLACKSWAN") {
+        // Pass the difficulty-adjusted impact to the rest of the app
+        addEvent({ ...event, impactPct: effectiveImpact, ts: Date.now() });
+      }
+
+      // Only show toast for non-blackswan events (black swan has modal)
+      if (event.type !== "BLACKSWAN") {
+        setEventMessage({
+          text: `${event.title} (${impactAbs >= 0 ? "+" : ""}${impactAbs})`,
+          type: event.type,
+        });
+        setTimeout(() => setEventMessage(null), 3000);
+      }
+
+      return updated;
+    });
+  }, [addEvent, difficulty]);
+>>>>>>> 3d82061ea3634ee0c52e1f2bc6310f5a88f38d12
 
   // --- Normal (MACRO/MICRO) random event generation ---
   useEffect(() => {
@@ -168,6 +213,9 @@ export default function GameController({
     loopRef.current.running = true;
 
     let cancelled = false;
+
+    // Compute cadence based on current difficulty level
+    const { min: levelMinMs, max: levelMaxMs } = getNewsCadenceMs(difficulty);
 
     async function fetchEventFromAPI() {
       try {
@@ -195,7 +243,8 @@ export default function GameController({
           console.warn("Error fetching event:", error);
         }
       }
-      const nextTimeout = NEWS_MIN_MS + Math.random() * (NEWS_MAX_MS - NEWS_MIN_MS); 
+      const nextTimeout =
+        levelMinMs + Math.random() * (levelMaxMs - levelMinMs);
       loopRef.current.timeoutId = setTimeout(scheduleEvent, nextTimeout);
     };
 
@@ -208,7 +257,7 @@ export default function GameController({
       loopRef.current.running = false;
       loopRef.current.timeoutId = null;
     };
-  }, [isActive, isPaused, emitEvents, handleEvent]);
+  }, [isActive, isPaused, emitEvents, handleEvent, difficulty]);
 
   // --- Black Swan emitter (rare, Poisson-timed) ---
   // Only active when game is active AND not paused
@@ -223,6 +272,56 @@ export default function GameController({
       handleEvent(ev);
     },
   });
+
+  // Force black swan event after ~1 minute (60 seconds) when game starts
+  useEffect(() => {
+    console.log("[BlackSwan] Effect running - isActive:", isActive, "isPaused:", isPaused, "blackSwanForcedRef:", blackSwanForcedRef.current);
+    
+    // Only set up timer when game becomes active and we haven't forced it yet
+    if (!isActive || isPaused || blackSwanForcedRef.current) {
+      console.log("[BlackSwan] Skipping timer setup - conditions not met");
+      return;
+    }
+
+    console.log("[BlackSwan] Setting up forced black swan timer - will trigger in 60 seconds");
+    
+    // Set flag immediately to prevent multiple timers
+    blackSwanForcedRef.current = true;
+    
+    // Wait 60 seconds, then trigger black swan
+    const timer = setTimeout(() => {
+      console.log("[BlackSwan] Timer fired! isActive:", isActive, "isPaused:", isPaused);
+      // Check again that game is still active and not paused
+      // Use refs to get current values at execution time
+      const stillActive = (controlledActive ?? active) && !gameEndedRef.current;
+      const stillPaused = isControlled ? !controlledActive : paused;
+      
+      if (stillActive && !stillPaused) {
+        console.log("[BlackSwan] Generating forced black swan event...");
+        generateEvent({ forceBlackSwan: true })
+          .then((result) => {
+            console.log("[BlackSwan] Result:", result);
+            if (result.success && result.event) {
+              console.log("[BlackSwan] Success! Setting black swan:", result.event);
+              setBlackSwan(result.event);
+              handleEvent(result.event);
+            } else {
+              console.warn("[BlackSwan] Event generation failed:", result);
+            }
+          })
+          .catch((error) => {
+            console.error("[BlackSwan] Error generating forced black swan:", error);
+          });
+      } else {
+        console.warn("[BlackSwan] Game not active or paused, skipping black swan. stillActive:", stillActive, "stillPaused:", stillPaused);
+      }
+    }, 60000); // 60 seconds = 1 minute
+
+    return () => {
+      console.log("[BlackSwan] Cleaning up timer");
+      clearTimeout(timer);
+    };
+  }, [isActive, isPaused, handleEvent, controlledActive, active, paused, isControlled]);
 
   // --- Player choice to resolve Black Swan (follow-up impact) ---
   function resolveBlackSwan(choice) {

@@ -70,6 +70,7 @@ function AppInner() {
   // Stats tracking
   const [pnlHistory, setPnlHistory] = useState([]); // [{timestamp, pnl}]
   const [streak, setStreak] = useState(0); // Survival streak
+  const [difficulty, setDifficulty] = useState(1); // Game difficulty level (rounds)
   const lastGamePnLRef = useRef(0);
   
   // Round tracking for AI Coach
@@ -341,6 +342,9 @@ function AppInner() {
     const survived = totalPnL >= lastGamePnLRef.current || totalPnL >= 0;
     setStreak((prev) => (survived ? prev + 1 : 0));
 
+    // Increase difficulty level when player survives; reset to 1 on failure
+    setDifficulty((prev) => (survived ? prev + 1 : 1));
+
     const gameIdToSave = currentGameIdRef.current || currentGameId;
     const participantIdToSave = currentParticipantIdRef.current || currentParticipantId;
 
@@ -490,7 +494,18 @@ function AppInner() {
       {/* Left column */}
       <section className="LeftRail glass">
         <div className="Avatar">
-          <div className="AvatarCircle">🙂</div>
+          <div className="AvatarCircle">
+            <img 
+              src="/logo.png" 
+              alt="Hedge Logo" 
+              style={{ 
+                width: '90%', 
+                height: '90%', 
+                objectFit: 'contain',
+                borderRadius: '50%'
+              }} 
+            />
+          </div>
           <div className="GameTitle">HEDGE</div>
         </div>
         
@@ -575,20 +590,50 @@ function AppInner() {
           </div>
         )}
 
-        <div style={{ marginTop: 12, display: "flex", gap: "8px", justifyContent: "center" }}>
-          <button className="btn btn-start" onClick={startGame}>
-            {gameOver ? "🔄 New Game" : "▶ Start"}
-          </button>
-          <button className="btn btn-pause" onClick={pauseGame} disabled={!gameActive}>
-            ⏸ Pause
-          </button>
-          <button
-            className="btn btn-resume"
-            onClick={resumeGame}
-            disabled={gameActive || gameOver}
-          >
-            ▶ Resume
-          </button>
+        {/* Game controls + difficulty indicator */}
+        <div style={{ 
+          marginTop: 16, 
+          display: "flex", 
+          flexDirection: "column",
+          gap: "8px", 
+          justifyContent: "center",
+          padding: "10px",
+          background: "rgba(0,0,0,.2)",
+          borderRadius: "12px",
+          border: "2px solid rgba(107,157,209,.2)",
+          boxShadow: "0 4px 16px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05)"
+        }}>
+          <div style={{ 
+            fontSize: "12px", 
+            opacity: 0.85, 
+            textAlign: "center",
+            marginBottom: 4 
+          }}>
+            Difficulty Level:{" "}
+            <span style={{ fontWeight: 700, color: "var(--accent)" }}>
+              Level {difficulty}
+            </span>
+          </div>
+          <div style={{ 
+            display: "flex", 
+            gap: "8px", 
+            justifyContent: "center",
+            flexWrap: "wrap"
+          }}>
+            <button className="btn btn-start" onClick={startGame}>
+              {gameOver ? "🔄 New Game" : "▶ Start"}
+            </button>
+            <button className="btn btn-pause" onClick={pauseGame} disabled={!gameActive}>
+              ⏸ Pause
+            </button>
+            <button
+              className="btn btn-resume"
+              onClick={resumeGame}
+              disabled={gameActive || gameOver}
+            >
+              ▶ Resume
+            </button>
+          </div>
         </div>
 
         <AICoachPanel 
@@ -814,6 +859,7 @@ function AppInner() {
           streak={streak}
           pnlHistory={pnlHistory}
         />
+
       </section>
 
       {/* Feedback Modal */}
