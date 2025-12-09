@@ -44,6 +44,7 @@ export default function GameController({
   const [blackSwan, setBlackSwan] = useState(null);
   const sessionStartedRef = useRef(false);
   const gameEndedRef = useRef(false);
+  const blackSwanForcedRef = useRef(false);
 
   // parent-controlled active flag (if provided)
   const isControlled = controlledActive !== undefined;
@@ -62,6 +63,7 @@ export default function GameController({
     setBlackSwan(null);
     sessionStartedRef.current = true;
     gameEndedRef.current = false;
+    blackSwanForcedRef.current = false; // Reset forced black swan flag
   }, [gameDuration, playerName]);
 
   const handleGameComplete = useCallback(() => {
@@ -197,6 +199,30 @@ export default function GameController({
       handleEvent(ev);
     },
   });
+
+  // Force black swan event after ~1 minute (60 seconds) when game starts
+  useEffect(() => {
+    if (isActive && !isPaused && !blackSwanForcedRef.current && !blackSwan) {
+      blackSwanForcedRef.current = true; // Set flag to prevent re-triggering
+      // Wait 60 seconds after game starts, then trigger black swan
+      const timer = setTimeout(() => {
+        if (isActive && !isPaused) {
+          generateEvent({ forceBlackSwan: true })
+            .then((result) => {
+              if (result.success && result.event) {
+                setBlackSwan(result.event);
+                handleEvent(result.event);
+              }
+            })
+            .catch((error) => {
+              console.error("Error generating forced black swan:", error);
+            });
+        }
+      }, 60000); // 60 seconds = 1 minute
+
+      return () => clearTimeout(timer);
+    }
+  }, [isActive, isPaused, blackSwan, handleEvent]);
 
   // --- Player choice to resolve Black Swan (follow-up impact) ---
   function resolveBlackSwan(choice) {
