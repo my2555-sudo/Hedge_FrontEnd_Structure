@@ -203,8 +203,11 @@ export default function GameController({
 
   // Force black swan event after ~1 minute (60 seconds) when game starts
   useEffect(() => {
+    console.log("[BlackSwan] Effect running - isActive:", isActive, "isPaused:", isPaused, "blackSwanForcedRef:", blackSwanForcedRef.current);
+    
     // Only set up timer when game becomes active and we haven't forced it yet
     if (!isActive || isPaused || blackSwanForcedRef.current) {
+      console.log("[BlackSwan] Skipping timer setup - conditions not met");
       return;
     }
 
@@ -217,7 +220,11 @@ export default function GameController({
     const timer = setTimeout(() => {
       console.log("[BlackSwan] Timer fired! isActive:", isActive, "isPaused:", isPaused);
       // Check again that game is still active and not paused
-      if (isActive && !isPaused) {
+      // Use refs to get current values at execution time
+      const stillActive = (controlledActive ?? active) && !gameEndedRef.current;
+      const stillPaused = isControlled ? !controlledActive : paused;
+      
+      if (stillActive && !stillPaused) {
         console.log("[BlackSwan] Generating forced black swan event...");
         generateEvent({ forceBlackSwan: true })
           .then((result) => {
@@ -234,7 +241,7 @@ export default function GameController({
             console.error("[BlackSwan] Error generating forced black swan:", error);
           });
       } else {
-        console.warn("[BlackSwan] Game not active or paused, skipping black swan");
+        console.warn("[BlackSwan] Game not active or paused, skipping black swan. stillActive:", stillActive, "stillPaused:", stillPaused);
       }
     }, 60000); // 60 seconds = 1 minute
 
@@ -242,7 +249,7 @@ export default function GameController({
       console.log("[BlackSwan] Cleaning up timer");
       clearTimeout(timer);
     };
-  }, [isActive, isPaused, handleEvent]);
+  }, [isActive, isPaused, handleEvent, controlledActive, active, paused, isControlled]);
 
   // --- Player choice to resolve Black Swan (follow-up impact) ---
   function resolveBlackSwan(choice) {
