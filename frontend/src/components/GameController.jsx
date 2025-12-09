@@ -202,27 +202,35 @@ export default function GameController({
 
   // Force black swan event after ~1 minute (60 seconds) when game starts
   useEffect(() => {
-    if (isActive && !isPaused && !blackSwanForcedRef.current && !blackSwan) {
-      blackSwanForcedRef.current = true; // Set flag to prevent re-triggering
-      // Wait 60 seconds after game starts, then trigger black swan
-      const timer = setTimeout(() => {
-        if (isActive && !isPaused) {
-          generateEvent({ forceBlackSwan: true })
-            .then((result) => {
-              if (result.success && result.event) {
-                setBlackSwan(result.event);
-                handleEvent(result.event);
-              }
-            })
-            .catch((error) => {
-              console.error("Error generating forced black swan:", error);
-            });
-        }
-      }, 60000); // 60 seconds = 1 minute
-
-      return () => clearTimeout(timer);
+    // Only set up timer when game becomes active and we haven't forced it yet
+    if (!isActive || isPaused || blackSwanForcedRef.current) {
+      return;
     }
-  }, [isActive, isPaused, blackSwan, handleEvent]);
+
+    // Set flag immediately to prevent multiple timers
+    blackSwanForcedRef.current = true;
+    
+    // Wait 60 seconds, then trigger black swan
+    const timer = setTimeout(() => {
+      // Check again that game is still active and not paused
+      if (isActive && !isPaused) {
+        generateEvent({ forceBlackSwan: true })
+          .then((result) => {
+            if (result.success && result.event) {
+              setBlackSwan(result.event);
+              handleEvent(result.event);
+            }
+          })
+          .catch((error) => {
+            console.error("Error generating forced black swan:", error);
+          });
+      }
+    }, 60000); // 60 seconds = 1 minute
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isActive, isPaused, handleEvent]);
 
   // --- Player choice to resolve Black Swan (follow-up impact) ---
   function resolveBlackSwan(choice) {
