@@ -439,7 +439,18 @@ function AppInner() {
           </div>
         )}
 
-        <div style={{ marginTop: 12, display: "flex", gap: "8px", justifyContent: "center" }}>
+        <div style={{ 
+          marginTop: 16, 
+          display: "flex", 
+          gap: "8px", 
+          justifyContent: "center",
+          padding: "10px",
+          background: "rgba(0,0,0,.2)",
+          borderRadius: "12px",
+          border: "2px solid rgba(107,157,209,.2)",
+          boxShadow: "0 4px 16px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.05)",
+          flexWrap: "wrap"
+        }}>
           <button className="btn btn-start" onClick={startGame}>
             {gameOver ? "🔄 New Game" : "▶ Start"}
           </button>
@@ -591,6 +602,7 @@ function AppInner() {
           streak={streak}
           pnlHistory={pnlHistory}
         />
+
       </section>
 
       {/* Feedback Modal */}
