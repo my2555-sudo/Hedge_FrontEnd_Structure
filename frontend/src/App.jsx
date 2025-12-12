@@ -16,6 +16,7 @@ import { EventProvider, useEventBus } from "./components/EventContext.jsx";
 import { useAuth } from "./contexts/AuthContext.jsx";
 import { useGameContext } from "./contexts/GameContext.jsx";
 import { usePriceSnapshots } from "./hooks/usePriceSnapshots.js";
+import { useRoundScore } from "./hooks/useRoundScore.js";
 import { getTickers } from "./api/tickers.js";
 import LoginPage from "./components/LoginPage.jsx";
 
@@ -24,10 +25,14 @@ function AppInner() {
   const {
     currentGameId,
     currentParticipantId,
+    currentRoundId,
     setTickerIdMap,
     initializeGame,
+    initializeRound,
+    endCurrentRound,
   } = useGameContext();
   const { captureSnapshots } = usePriceSnapshots();
+  const { saveScore } = useRoundScore();
 
   // --- game state (top-level UI timer only) ---
   // All hooks must be called before any early returns (React Hooks rules)
@@ -277,12 +282,20 @@ function AppInner() {
     if (gameActive && !currentGameId) {
       // Initialize game and participant
       initializeGame(STARTING_CASH)
-        .then((result) => {
+        .then(async (result) => {
           if (result.success) {
             // Store game ID in ref (persists even if state is cleared)
             currentGameIdRef.current = result.gameId;
             // Store participant ID in ref
             currentParticipantIdRef.current = result.participantId;
+
+            // Also create initial round 1 for this game so snapshots & scores have round_id
+            const roundResult = await initializeRound(1, result.gameId);
+            if (roundResult?.success && roundResult.roundId) {
+              console.log("Initialized round 1 for game", result.gameId, "roundId:", roundResult.roundId);
+            } else {
+              console.warn("Failed to initialize round 1:", roundResult?.error);
+            }
           } else {
             console.error("Failed to initialize game:", result.error);
           }
@@ -291,7 +304,7 @@ function AppInner() {
           console.error("Error initializing game:", err);
         });
     }
-  }, [gameActive, currentGameId, initializeGame]);
+  }, [gameActive, currentGameId, initializeGame, initializeRound]);
 
   // Update participant ID ref when it changes
   useEffect(() => {
@@ -358,6 +371,26 @@ function AppInner() {
         );
         return currentPortfolio;
       });
+    }
+    
+    // Persist round score if we have an active round & participant
+    if (currentRoundId && participantIdToSave) {
+      await saveScore({
+        totalPnL,
+        lastRoundPnL: lastGamePnLRef.current,
+        recentTrades,
+        lastEvent,
+        eventTimestamp: lastEvent?.ts ?? null,
+      });
+    }
+
+    // Mark round as ended in backend (if any)
+    if (currentRoundId) {
+      try {
+        await endCurrentRound();
+      } catch (err) {
+        console.warn("Failed to end round:", err);
+      }
     }
     
     // Prepare game-end feedback data with comprehensive news analysis

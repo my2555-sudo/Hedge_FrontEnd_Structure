@@ -12,42 +12,69 @@ Hedge is a simulated financial trading platform that allows beginner investors t
 - **Styling**: CSS
 
 ## Setup Instructions (How to Run Locally)
-### Frontend
-1. Navigate to the `frontend` directory:
+
+### Prerequisites
+
+- Node.js 18+ and npm
+- Python 3.10+ and pip
+
+### 1. Backend API
+
+1. From the project root:
    ```bash
-   cd frontend
+   cd Hedge_FrontEnd_Structure
    ```
-2. Install dependencies:
+2. (Optional but recommended) create and activate a virtual environment:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   ```
+   On Windows:
+   ```bash
+   .venv\Scripts\activate
+   ```
+3. Install Python dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Start the FastAPI server:
+   ```bash
+   uvicorn backend.main:app --reload --port 8000
+   ```
+
+The API will be available at `http://localhost:8000`.
+
+### 2. Frontend App
+
+1. In a new terminal window:
+   ```bash
+   cd Hedge_FrontEnd_Structure/frontend
+   ```
+2. Install frontend dependencies:
    ```bash
    npm install
    ```
-3. Start the development server:
+3. Start the Vite dev server:
    ```bash
    npm run dev
    ```
 
-### Backend
-1. Navigate to the `backend` directory:
-   ```bash
-   cd backend
-   ```
-2. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Start the FastAPI server:
-   ```bash
-   uvicorn main:app --reload
-   ```
+The frontend will be available at the URL printed by Vite, typically `http://localhost:5173`.
 
 ## Environment Variables Needed
-Create a `.env` file in the root directory with the following variables:
+Create a `.env` file in the project root with the following variables:
 ```env
 SUPABASE_URL=<your-supabase-url>
 SUPABASE_KEY=<your-supabase-key>
 ```
 
-## API Endpoint Documentation
+Create a `.env` file in `frontend/` with the following variables:
+```env
+VITE_SUPABASE_URL=<your-supabase-url>
+VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
+VITE_API_BASE_URL=http://localhost:8000
+```
+
 ## API Endpoint Documentation
 
 Base URL:

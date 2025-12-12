@@ -76,37 +76,47 @@ export function GameProvider({ children }) {
   }, [user]);
 
   /**
-   * Initialize round - create or get round for current game
+   * Initialize round - create or get round for current game.
+   * Optionally accepts an explicit gameId to avoid race conditions when game
+   * state was just created and React state hasn't updated yet.
    */
-  const initializeRound = useCallback(async (roundNo) => {
-    if (!currentGameId) {
-      console.warn("Cannot initialize round: game not initialized");
-      return { success: false, error: "Game not initialized" };
-    }
+  const initializeRound = useCallback(
+    async (roundNo, overrideGameId = null) => {
+      const gameIdToUse = overrideGameId || currentGameId;
 
-    try {
-      const roundResult = await createOrGetRound({
-        game_id: currentGameId,
-        round_no: roundNo,
-      });
-
-      if (!roundResult.success || !roundResult.round) {
-        console.error("Failed to create/get round:", roundResult.error);
-        return { success: false, error: roundResult.error };
+      if (!gameIdToUse) {
+        console.warn("Cannot initialize round: game not initialized", {
+          currentGameId,
+          overrideGameId,
+        });
+        return { success: false, error: "Game not initialized" };
       }
 
-      const roundId = roundResult.round.id;
-      setCurrentRoundId(roundId);
+      try {
+        const roundResult = await createOrGetRound({
+          game_id: gameIdToUse,
+          round_no: roundNo,
+        });
 
-      return {
-        success: true,
-        roundId,
-      };
-    } catch (error) {
-      console.error("Error initializing round:", error);
-      return { success: false, error: error.message };
-    }
-  }, [currentGameId]);
+        if (!roundResult.success || !roundResult.round) {
+          console.error("Failed to create/get round:", roundResult.error);
+          return { success: false, error: roundResult.error };
+        }
+
+        const roundId = roundResult.round.id;
+        setCurrentRoundId(roundId);
+
+        return {
+          success: true,
+          roundId,
+        };
+      } catch (error) {
+        console.error("Error initializing round:", error);
+        return { success: false, error: error.message };
+      }
+    },
+    [currentGameId]
+  );
 
   /**
    * End current round
